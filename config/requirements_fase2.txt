@@ -1,0 +1,47 @@
+# BestStag v9.1 + Abacus.AI - Requirements Fase 2
+# IA Contextual e Front-end Inteligente
+
+# Core dependencies (Fase 1)
+requests>=2.31.0
+python-dotenv>=1.0.0
+
+# IA e Machine Learning
+sentence-transformers>=2.2.0
+faiss-cpu>=1.7.0
+numpy>=1.24.0
+
+# Async e performance
+aiohttp>=3.8.0
+asyncio-throttle>=1.0.0
+
+# Data processing
+pandas>=2.0.0
+scikit-learn>=1.3.0
+
+# Validação e serialização
+pydantic>=2.0.0
+marshmallow>=3.19.0
+
+# Cache avançado
+redis>=4.5.0
+diskcache>=5.6.0
+
+# Frontend dependencies (React)
+# Estas dependências são instaladas via npm no projeto React
+
+# Development dependencies
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.5.0
+
+# Monitoring e logging
+structlog>=23.0.0
+prometheus-client>=0.17.0
+
+# Optional: Para desenvolvimento local com Jupyter
+# jupyter>=1.0.0
+# matplotlib>=3.7.0
+# seaborn>=0.12.0
+

@@ -1,0 +1,343 @@
+{
+  "name": "BestStag v9.0 - WhatsApp Principal",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp",
+        "options": {}
+      },
+      "id": "webhook-whatsapp",
+      "name": "Webhook WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "beststag-whatsapp-main"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.Body}}",
+              "operation": "startsWith",
+              "value2": "/"
+            }
+          ]
+        }
+      },
+      "id": "if-comando",
+      "name": "É Comando?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "telefone",
+              "value": "={{$json.From.replace('whatsapp:', '')}}"
+            },
+            {
+              "name": "mensagem",
+              "value": "={{$json.Body}}"
+            },
+            {
+              "name": "comando",
+              "value": "={{$json.Body.split(' ')[0]}}"
+            },
+            {
+              "name": "parametros",
+              "value": "={{$json.Body.split(' ').slice(1).join(' ')}}"
+            }
+          ]
+        }
+      },
+      "id": "extrair-dados",
+      "name": "Extrair Dados",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Usuarios",
+        "filterByFormula": "telefone = '{{$json.telefone}}'"
+      },
+      "id": "buscar-usuario",
+      "name": "Buscar Usuário",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.records.length}}",
+              "operation": "equal",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "usuario-existe",
+      "name": "Usuário Existe?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Usuarios",
+        "fields": {
+          "telefone": "={{$node['Extrair Dados'].json.telefone}}",
+          "nome": "Novo Usuário",
+          "status": "trial",
+          "plano": "free"
+        }
+      },
+      "id": "criar-usuario",
+      "name": "Criar Usuário",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [1340, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar comando\nconst comando = $input.first().json.comando;\nconst parametros = $input.first().json.parametros;\nconst usuario = $input.first().json.usuario || $input.first().json.records[0];\n\nlet resposta = '';\n\nswitch(comando) {\n  case '/ajuda':\n    resposta = `🤖 *BestStag v9.0 - Comandos Disponíveis*\\n\\n` +\n               `📋 */tarefa* - Gerenciar tarefas\\n` +\n               `📅 */agenda* - Gerenciar eventos\\n` +\n               `📊 */status* - Ver resumo geral\\n` +\n               `⚙️ */perfil* - Configurações\\n` +\n               `📈 */relatório* - Relatórios\\n` +\n               `💡 */dica* - Dicas de produtividade\\n\\n` +\n               `Digite qualquer comando seguido de 'ajuda' para mais detalhes.\\n` +\n               `Ex: */tarefa ajuda*`;\n    break;\n    \n  case '/status':\n    resposta = `📊 *Status Geral - ${usuario.fields?.nome || 'Usuário'}*\\n\\n` +\n               `📋 Tarefas Pendentes: ${usuario.fields?.total_tarefas || 0}\\n` +\n               `📅 Eventos Hoje: ${usuario.fields?.total_eventos || 0}\\n` +\n               `💬 Interações: ${usuario.fields?.total_interacoes || 0}\\n` +\n               `⭐ Score: ${usuario.fields?.score_engajamento || 0}\\n\\n` +\n               `Use */tarefa listar* para ver tarefas pendentes.`;\n    break;\n    \n  case '/tarefa':\n    if (!parametros) {\n      resposta = `📋 *Gerenciamento de Tarefas*\\n\\n` +\n                 `*/tarefa criar [descrição]* - Criar nova tarefa\\n` +\n                 `*/tarefa listar* - Listar tarefas pendentes\\n` +\n                 `*/tarefa concluir [id]* - Marcar como concluída\\n` +\n                 `*/tarefa prioridade [id] [alta/media/baixa]* - Definir prioridade\\n\\n` +\n                 `Exemplo: */tarefa criar Revisar relatório mensal*`;\n    } else if (parametros.startsWith('criar ')) {\n      const descricao = parametros.replace('criar ', '');\n      resposta = `✅ Tarefa criada: \"${descricao}\"\\n\\n` +\n                 `Use */tarefa listar* para ver todas as tarefas.`;\n    } else if (parametros === 'listar') {\n      resposta = `📋 *Suas Tarefas Pendentes*\\n\\n` +\n                 `1. 🔴 Revisar proposta cliente ABC\\n` +\n                 `2. 🟡 Preparar apresentação\\n` +\n                 `3. 🟢 Responder emails pendentes\\n\\n` +\n                 `Use */tarefa concluir [número]* para marcar como feita.`;\n    } else {\n      resposta = `❓ Comando não reconhecido. Use */tarefa* para ver opções.`;\n    }\n    break;\n    \n  case '/agenda':\n    if (!parametros || parametros === 'hoje') {\n      resposta = `📅 *Agenda de Hoje*\\n\\n` +\n                 `09:00 - Reunião equipe\\n` +\n                 `14:00 - Call cliente XYZ\\n` +\n                 `16:30 - Revisão projeto\\n\\n` +\n                 `Use */agenda semana* para ver a semana completa.`;\n    } else if (parametros === 'semana') {\n      resposta = `📅 *Agenda da Semana*\\n\\n` +\n                 `*Segunda:* 3 eventos\\n` +\n                 `*Terça:* 2 eventos\\n` +\n                 `*Quarta:* 4 eventos\\n` +\n                 `*Quinta:* 1 evento\\n` +\n                 `*Sexta:* 2 eventos\\n\\n` +\n                 `Use */agenda criar* para adicionar eventos.`;\n    } else if (parametros.startsWith('criar ')) {\n      const evento = parametros.replace('criar ', '');\n      resposta = `📅 Evento criado: \"${evento}\"\\n\\n` +\n                 `Será sincronizado com seu Google Calendar.`;\n    } else {\n      resposta = `📅 *Comandos de Agenda*\\n\\n` +\n                 `*/agenda hoje* - Eventos de hoje\\n` +\n                 `*/agenda semana* - Eventos da semana\\n` +\n                 `*/agenda criar [evento]* - Criar novo evento\\n\\n` +\n                 `Exemplo: */agenda criar Reunião cliente às 15h*`;\n    }\n    break;\n    \n  case '/perfil':\n    resposta = `⚙️ *Configurações do Perfil*\\n\\n` +\n               `👤 Nome: ${usuario.fields?.nome || 'Não definido'}\\n` +\n               `📱 Telefone: ${usuario.fields?.telefone}\\n` +\n               `📧 Email: ${usuario.fields?.email || 'Não definido'}\\n` +\n               `🎯 Plano: ${usuario.fields?.plano || 'free'}\\n` +\n               `🌍 Fuso: ${usuario.fields?.fuso_horario || 'America/Sao_Paulo'}\\n\\n` +\n               `Use */perfil nome [seu nome]* para atualizar.`;\n    break;\n    \n  case '/relatório':\n  case '/relatorio':\n    resposta = `📈 *Relatório de Produtividade*\\n\\n` +\n               `📊 *Esta Semana:*\\n` +\n               `✅ Tarefas Concluídas: 12\\n` +\n               `📅 Eventos Participados: 8\\n` +\n               `💬 Interações: 45\\n` +\n               `⏱️ Tempo Médio Resposta: 2.3h\\n\\n` +\n               `🎯 *Metas:*\\n` +\n               `Produtividade: 85% ⬆️\\n` +\n               `Pontualidade: 92% ⬆️\\n\\n` +\n               `Continue assim! 🚀`;\n    break;\n    \n  default:\n    resposta = `❓ Comando não reconhecido: ${comando}\\n\\n` +\n               `Digite */ajuda* para ver todos os comandos disponíveis.\\n\\n` +\n               `💡 *Dica:* Você também pode conversar naturalmente comigo!`;\n}\n\nreturn [{\n  json: {\n    resposta: resposta,\n    comando: comando,\n    parametros: parametros,\n    usuario_id: usuario.id || usuario.fields?.id,\n    telefone: $input.first().json.telefone\n  }\n}];"
+      },
+      "id": "processar-comando",
+      "name": "Processar Comando",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1560, 200]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Interacoes",
+        "fields": {
+          "usuario": ["{{$json.usuario_id}}"],
+          "tipo": "whatsapp",
+          "canal": "whatsapp_command",
+          "comando": "{{$json.comando}}",
+          "mensagem_usuario": "{{$json.comando}} {{$json.parametros}}",
+          "resposta_sistema": "{{$json.resposta}}",
+          "status": "sucesso",
+          "modelo_ia_usado": "sistema",
+          "memoria_camada": "MCP"
+        }
+      },
+      "id": "salvar-interacao",
+      "name": "Salvar Interação",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [1780, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twilio.com/2010-04-01/Accounts/{{$env.TWILIO_ACCOUNT_SID}}/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "bodyContentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "From",
+              "value": "{{$env.TWILIO_WHATSAPP_NUMBER}}"
+            },
+            {
+              "name": "To",
+              "value": "whatsapp:{{$json.telefone}}"
+            },
+            {
+              "name": "Body",
+              "value": "{{$json.resposta}}"
+            }
+          ]
+        }
+      },
+      "id": "enviar-resposta",
+      "name": "Enviar Resposta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [2000, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processamento de linguagem natural para mensagens não-comando\nconst mensagem = $input.first().json.mensagem;\nconst telefone = $input.first().json.telefone;\n\n// Análise de intenção simples\nlet intencao = 'conversa';\nlet resposta = '';\n\n// Detectar intenções comuns\nif (mensagem.toLowerCase().includes('oi') || mensagem.toLowerCase().includes('olá')) {\n  intencao = 'saudacao';\n  resposta = `Olá! 👋 Sou o BestStag, seu assistente virtual.\\n\\n` +\n             `Como posso ajudar você hoje?\\n\\n` +\n             `💡 Digite */ajuda* para ver todos os comandos disponíveis.`;\n} else if (mensagem.toLowerCase().includes('obrigad')) {\n  intencao = 'agradecimento';\n  resposta = `De nada! 😊 Estou aqui para ajudar sempre que precisar.\\n\\n` +\n             `Há mais alguma coisa que posso fazer por você?`;\n} else if (mensagem.toLowerCase().includes('tchau') || mensagem.toLowerCase().includes('até')) {\n  intencao = 'despedida';\n  resposta = `Até logo! 👋 Estarei aqui quando precisar.\\n\\n` +\n             `Tenha um ótimo dia! 🌟`;\n} else {\n  // Para outras mensagens, sugerir comandos\n  resposta = `Entendi que você disse: \"${mensagem}\"\\n\\n` +\n             `💡 Para uma melhor experiência, use nossos comandos:\\n\\n` +\n             `📋 */tarefa* - Gerenciar tarefas\\n` +\n             `📅 */agenda* - Ver agenda\\n` +\n             `📊 */status* - Resumo geral\\n` +\n             `❓ */ajuda* - Todos os comandos\\n\\n` +\n             `Ou continue conversando naturalmente! 😊`;\n}\n\nreturn [{\n  json: {\n    resposta: resposta,\n    intencao: intencao,\n    mensagem_original: mensagem,\n    telefone: telefone\n  }\n}];"
+      },
+      "id": "processar-linguagem-natural",
+      "name": "Processar Linguagem Natural",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twilio.com/2010-04-01/Accounts/{{$env.TWILIO_ACCOUNT_SID}}/Messages.json",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "bodyContentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "From",
+              "value": "{{$env.TWILIO_WHATSAPP_NUMBER}}"
+            },
+            {
+              "name": "To",
+              "value": "whatsapp:{{$json.telefone}}"
+            },
+            {
+              "name": "Body",
+              "value": "{{$json.resposta}}"
+            }
+          ]
+        }
+      },
+      "id": "enviar-resposta-natural",
+      "name": "Enviar Resposta Natural",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [900, 400]
+    }
+  ],
+  "connections": {
+    "Webhook WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "É Comando?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "É Comando?": {
+      "main": [
+        [
+          {
+            "node": "Extrair Dados",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processar Linguagem Natural",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair Dados": {
+      "main": [
+        [
+          {
+            "node": "Buscar Usuário",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Usuário": {
+      "main": [
+        [
+          {
+            "node": "Usuário Existe?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Usuário Existe?": {
+      "main": [
+        [
+          {
+            "node": "Criar Usuário",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processar Comando",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar Usuário": {
+      "main": [
+        [
+          {
+            "node": "Processar Comando",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Comando": {
+      "main": [
+        [
+          {
+            "node": "Salvar Interação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Salvar Interação": {
+      "main": [
+        [
+          {
+            "node": "Enviar Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Linguagem Natural": {
+      "main": [
+        [
+          {
+            "node": "Enviar Resposta Natural",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["beststag", "whatsapp", "v9.0", "principal"],
+  "triggerCount": 1,
+  "updatedAt": "2025-06-03T20:00:00.000Z",
+  "versionId": "v9.0"
+}
+

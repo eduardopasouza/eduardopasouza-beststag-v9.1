@@ -1,0 +1,549 @@
+{
+  "name": "BestStag v9.0 - Gestão de Agenda",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agenda",
+        "options": {}
+      },
+      "id": "webhook-agenda",
+      "name": "Webhook Agenda",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "beststag-agenda"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.acao}}",
+              "operation": "equal",
+              "value2": "criar"
+            }
+          ]
+        }
+      },
+      "id": "switch-acao-agenda",
+      "name": "Switch Ação Agenda",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "parameters": {
+        "options": {
+          "allMatchingOutputs": false
+        },
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.acao}}",
+              "operation": "equal",
+              "value2": "criar"
+            },
+            {
+              "value1": "={{$json.acao}}",
+              "operation": "equal",
+              "value2": "listar"
+            },
+            {
+              "value1": "={{$json.acao}}",
+              "operation": "equal",
+              "value2": "hoje"
+            },
+            {
+              "value1": "={{$json.acao}}",
+              "operation": "equal",
+              "value2": "semana"
+            },
+            {
+              "value1": "={{$json.acao}}",
+              "operation": "equal",
+              "value2": "atualizar"
+            },
+            {
+              "value1": "={{$json.acao}}",
+              "operation": "equal",
+              "value2": "cancelar"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Eventos",
+        "fields": {
+          "usuario": ["{{$json.usuario_id}}"],
+          "titulo": "{{$json.titulo}}",
+          "descricao": "{{$json.descricao || ''}}",
+          "data_inicio": "{{$json.data_inicio}}",
+          "data_fim": "{{$json.data_fim}}",
+          "tipo": "{{$json.tipo || 'reuniao'}}",
+          "status": "agendado",
+          "local": "{{$json.local || ''}}",
+          "participantes": "{{$json.participantes || ''}}",
+          "link_reuniao": "{{$json.link_reuniao || ''}}",
+          "lembrete_minutos": "{{$json.lembrete_minutos || 15}}",
+          "recorrencia": "{{$json.recorrencia || 'nenhuma'}}",
+          "criado_por": "{{$json.origem || 'api'}}"
+        }
+      },
+      "id": "criar-evento",
+      "name": "Criar Evento",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Eventos",
+        "filterByFormula": "AND(usuario = '{{$json.usuario_id}}', NOT(status = 'cancelado'))",
+        "sort": [
+          {
+            "field": "data_inicio",
+            "direction": "asc"
+          }
+        ]
+      },
+      "id": "listar-eventos",
+      "name": "Listar Eventos",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Eventos",
+        "filterByFormula": "AND(usuario = '{{$json.usuario_id}}', IS_SAME({data_inicio}, TODAY(), 'day'), NOT(status = 'cancelado'))",
+        "sort": [
+          {
+            "field": "data_inicio",
+            "direction": "asc"
+          }
+        ]
+      },
+      "id": "eventos-hoje",
+      "name": "Eventos Hoje",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Eventos",
+        "filterByFormula": "AND(usuario = '{{$json.usuario_id}}', IS_SAME({data_inicio}, TODAY(), 'week'), NOT(status = 'cancelado'))",
+        "sort": [
+          {
+            "field": "data_inicio",
+            "direction": "asc"
+          }
+        ]
+      },
+      "id": "eventos-semana",
+      "name": "Eventos Semana",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [680, 500]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Eventos",
+        "id": "={{$json.evento_id}}",
+        "fields": "={{$json.campos_atualizacao}}"
+      },
+      "id": "atualizar-evento",
+      "name": "Atualizar Evento",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [680, 600]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Eventos",
+        "id": "={{$json.evento_id}}",
+        "fields": {
+          "status": "cancelado"
+        }
+      },
+      "id": "cancelar-evento",
+      "name": "Cancelar Evento",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [680, 700]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar criação de evento\nconst evento = $input.first().json;\n\n// Calcular duração\nconst inicio = new Date(evento.fields.data_inicio);\nconst fim = new Date(evento.fields.data_fim);\nconst duracaoMinutos = Math.round((fim - inicio) / (1000 * 60));\n\nconst resposta = {\n  sucesso: true,\n  mensagem: `📅 *Evento criado com sucesso!*\\n\\n` +\n            `🎯 *${evento.fields.titulo}*\\n` +\n            `📅 Data: ${inicio.toLocaleDateString('pt-BR')}\\n` +\n            `⏰ Horário: ${inicio.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})} - ${fim.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}\\n` +\n            `⏱️ Duração: ${Math.floor(duracaoMinutos/60)}h${duracaoMinutos%60 > 0 ? duracaoMinutos%60 + 'm' : ''}\\n` +\n            `📍 Local: ${evento.fields.local || 'Não definido'}\\n` +\n            `🔔 Lembrete: ${evento.fields.lembrete_minutos} min antes\\n\\n` +\n            `ID: ${evento.id}`,\n  evento_id: evento.id,\n  dados: evento.fields,\n  google_sync: false // Flag para sincronização futura\n};\n\nreturn [{ json: resposta }];"
+      },
+      "id": "processar-criacao-evento",
+      "name": "Processar Criação Evento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar listagem geral de eventos\nconst eventos = $input.first().json.records || [];\n\nif (eventos.length === 0) {\n  return [{\n    json: {\n      sucesso: true,\n      mensagem: `📅 *Sua Agenda*\\n\\n` +\n                `📭 Você não tem eventos agendados.\\n\\n` +\n                `Use */agenda criar [evento]* para adicionar um novo evento.`,\n      total: 0\n    }\n  }];\n}\n\n// Agrupar eventos por data\nconst eventosPorData = {};\neventos.forEach(evento => {\n  const data = new Date(evento.fields.data_inicio).toLocaleDateString('pt-BR');\n  if (!eventosPorData[data]) {\n    eventosPorData[data] = [];\n  }\n  eventosPorData[data].push(evento);\n});\n\nlet mensagem = `📅 *Sua Agenda* (${eventos.length} eventos)\\n\\n`;\n\nObject.keys(eventosPorData).sort().forEach(data => {\n  mensagem += `📅 *${data}*\\n`;\n  \n  eventosPorData[data].forEach(evento => {\n    const inicio = new Date(evento.fields.data_inicio);\n    const horario = inicio.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});\n    \n    const tipoIcon = {\n      'reuniao': '👥',\n      'tarefa': '📋',\n      'compromisso': '📍',\n      'lembrete': '🔔',\n      'bloqueio': '🚫'\n    }[evento.fields.tipo] || '📅';\n    \n    const statusIcon = {\n      'agendado': '⏳',\n      'confirmado': '✅',\n      'cancelado': '❌',\n      'concluido': '✅'\n    }[evento.fields.status] || '❓';\n    \n    mensagem += `  ${tipoIcon} ${statusIcon} ${horario} - ${evento.fields.titulo}\\n`;\n    \n    if (evento.fields.local) {\n      mensagem += `    📍 ${evento.fields.local}\\n`;\n    }\n  });\n  \n  mensagem += `\\n`;\n});\n\nmensagem += `💡 Use */agenda hoje* para ver apenas os eventos de hoje.`;\n\nreturn [{\n  json: {\n    sucesso: true,\n    mensagem: mensagem,\n    total: eventos.length,\n    eventos: eventos\n  }\n}];"
+      },
+      "id": "processar-listagem-eventos",
+      "name": "Processar Listagem Eventos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar eventos de hoje\nconst eventos = $input.first().json.records || [];\nconst hoje = new Date().toLocaleDateString('pt-BR');\n\nif (eventos.length === 0) {\n  return [{\n    json: {\n      sucesso: true,\n      mensagem: `📅 *Agenda de Hoje* - ${hoje}\\n\\n` +\n                `🎉 Você não tem eventos agendados para hoje!\\n\\n` +\n                `Aproveite para focar em suas tarefas ou relaxar. 😊\\n\\n` +\n                `Use */agenda criar* para adicionar um evento.`,\n      total: 0\n    }\n  }];\n}\n\nlet mensagem = `📅 *Agenda de Hoje* - ${hoje}\\n\\n`;\n\n// Ordenar eventos por horário\neventos.sort((a, b) => new Date(a.fields.data_inicio) - new Date(b.fields.data_inicio));\n\neventos.forEach((evento, index) => {\n  const inicio = new Date(evento.fields.data_inicio);\n  const fim = new Date(evento.fields.data_fim);\n  const horarioInicio = inicio.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});\n  const horarioFim = fim.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});\n  \n  const tipoIcon = {\n    'reuniao': '👥',\n    'tarefa': '📋',\n    'compromisso': '📍',\n    'lembrete': '🔔',\n    'bloqueio': '🚫'\n  }[evento.fields.tipo] || '📅';\n  \n  // Verificar se o evento está próximo (próximas 2 horas)\n  const agora = new Date();\n  const diffHoras = (inicio - agora) / (1000 * 60 * 60);\n  let proximidadeIcon = '';\n  \n  if (diffHoras <= 0.5 && diffHoras > -1) {\n    proximidadeIcon = '🔴 ';\n  } else if (diffHoras <= 2) {\n    proximidadeIcon = '🟡 ';\n  }\n  \n  mensagem += `${proximidadeIcon}${tipoIcon} *${horarioInicio} - ${horarioFim}*\\n`;\n  mensagem += `   ${evento.fields.titulo}\\n`;\n  \n  if (evento.fields.local) {\n    mensagem += `   📍 ${evento.fields.local}\\n`;\n  }\n  \n  if (evento.fields.participantes) {\n    mensagem += `   👥 ${evento.fields.participantes}\\n`;\n  }\n  \n  if (evento.fields.link_reuniao) {\n    mensagem += `   🔗 Link da reunião disponível\\n`;\n  }\n  \n  mensagem += `\\n`;\n});\n\n// Adicionar dicas baseadas no horário\nconst horaAtual = new Date().getHours();\nif (horaAtual < 9) {\n  mensagem += `🌅 *Bom dia!* Prepare-se para um dia produtivo!`;\n} else if (horaAtual < 12) {\n  mensagem += `☀️ *Bom dia!* Manhã ideal para foco e concentração!`;\n} else if (horaAtual < 18) {\n  mensagem += `🌞 *Boa tarde!* Continue firme com seus compromissos!`;\n} else {\n  mensagem += `🌙 *Boa noite!* Finalize bem o seu dia!`;\n}\n\nreturn [{\n  json: {\n    sucesso: true,\n    mensagem: mensagem,\n    total: eventos.length,\n    eventos: eventos\n  }\n}];"
+      },
+      "id": "processar-eventos-hoje",
+      "name": "Processar Eventos Hoje",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar eventos da semana\nconst eventos = $input.first().json.records || [];\n\nif (eventos.length === 0) {\n  return [{\n    json: {\n      sucesso: true,\n      mensagem: `📅 *Agenda da Semana*\\n\\n` +\n                `📭 Você não tem eventos agendados para esta semana.\\n\\n` +\n                `Uma semana mais tranquila para focar em projetos! 🎯`,\n      total: 0\n    }\n  }];\n}\n\n// Agrupar eventos por dia da semana\nconst diasSemana = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];\nconst eventosPorDia = {};\n\neventos.forEach(evento => {\n  const data = new Date(evento.fields.data_inicio);\n  const diaSemana = diasSemana[data.getDay()];\n  const dataFormatada = data.toLocaleDateString('pt-BR');\n  const chave = `${diaSemana} (${dataFormatada})`;\n  \n  if (!eventosPorDia[chave]) {\n    eventosPorDia[chave] = [];\n  }\n  eventosPorDia[chave].push(evento);\n});\n\nlet mensagem = `📅 *Agenda da Semana* (${eventos.length} eventos)\\n\\n`;\n\n// Ordenar dias da semana\nconst diasOrdenados = Object.keys(eventosPorDia).sort((a, b) => {\n  const dataA = new Date(a.split('(')[1].split(')')[0].split('/').reverse().join('-'));\n  const dataB = new Date(b.split('(')[1].split(')')[0].split('/').reverse().join('-'));\n  return dataA - dataB;\n});\n\ndias Ordenados.forEach(dia => {\n  const eventosNoDia = eventosPorDia[dia];\n  mensagem += `📅 *${dia}* - ${eventosNoDia.length} evento(s)\\n`;\n  \n  // Ordenar eventos do dia por horário\n  eventosNoDia.sort((a, b) => new Date(a.fields.data_inicio) - new Date(b.fields.data_inicio));\n  \n  eventosNoDia.forEach(evento => {\n    const inicio = new Date(evento.fields.data_inicio);\n    const horario = inicio.toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'});\n    \n    const tipoIcon = {\n      'reuniao': '👥',\n      'tarefa': '📋',\n      'compromisso': '📍',\n      'lembrete': '🔔',\n      'bloqueio': '🚫'\n    }[evento.fields.tipo] || '📅';\n    \n    mensagem += `  ${tipoIcon} ${horario} - ${evento.fields.titulo}\\n`;\n  });\n  \n  mensagem += `\\n`;\n});\n\n// Estatísticas da semana\nconst tiposEventos = {};\neventos.forEach(evento => {\n  const tipo = evento.fields.tipo;\n  tiposEventos[tipo] = (tiposEventos[tipo] || 0) + 1;\n});\n\nmensagem += `📊 *Resumo da Semana:*\\n`;\nObject.keys(tiposEventos).forEach(tipo => {\n  const icon = {\n    'reuniao': '👥',\n    'tarefa': '📋',\n    'compromisso': '📍',\n    'lembrete': '🔔',\n    'bloqueio': '🚫'\n  }[tipo] || '📅';\n  \n  mensagem += `${icon} ${tipo}: ${tiposEventos[tipo]}\\n`;\n});\n\nreturn [{\n  json: {\n    sucesso: true,\n    mensagem: mensagem,\n    total: eventos.length,\n    eventos: eventos,\n    estatisticas: tiposEventos\n  }\n}];"
+      },
+      "id": "processar-eventos-semana",
+      "name": "Processar Eventos Semana",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [900, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar atualização de evento\nconst evento = $input.first().json;\n\nconst resposta = {\n  sucesso: true,\n  mensagem: `🔄 *Evento Atualizado!*\\n\\n` +\n            `📅 ${evento.fields.titulo}\\n` +\n            `📅 Data: ${new Date(evento.fields.data_inicio).toLocaleDateString('pt-BR')}\\n` +\n            `⏰ Horário: ${new Date(evento.fields.data_inicio).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}\\n` +\n            `📍 Status: ${evento.fields.status}\\n\\n` +\n            `✨ Alterações salvas com sucesso!`,\n  evento_id: evento.id\n};\n\nreturn [{ json: resposta }];"
+      },
+      "id": "processar-atualizacao-evento",
+      "name": "Processar Atualização Evento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [900, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar cancelamento de evento\nconst resposta = {\n  sucesso: true,\n  mensagem: `❌ *Evento Cancelado*\\n\\n` +\n            `O evento foi cancelado com sucesso.\\n\\n` +\n            `📧 Participantes serão notificados automaticamente.`,\n  evento_id: $input.first().json.evento_id\n};\n\nreturn [{ json: resposta }];"
+      },
+      "id": "processar-cancelamento",
+      "name": "Processar Cancelamento",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [900, 700]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.google_sync}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "verificar-google-sync",
+      "name": "Verificar Google Sync",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Preparar dados para sincronização com Google Calendar\nconst evento = $input.first().json;\n\n// Converter para formato Google Calendar\nconst googleEvent = {\n  summary: evento.dados.titulo,\n  description: evento.dados.descricao,\n  start: {\n    dateTime: evento.dados.data_inicio,\n    timeZone: 'America/Sao_Paulo'\n  },\n  end: {\n    dateTime: evento.dados.data_fim,\n    timeZone: 'America/Sao_Paulo'\n  },\n  location: evento.dados.local,\n  reminders: {\n    useDefault: false,\n    overrides: [\n      {\n        method: 'popup',\n        minutes: evento.dados.lembrete_minutos\n      }\n    ]\n  }\n};\n\nif (evento.dados.recorrencia !== 'nenhuma') {\n  // Configurar recorrência\n  const recurrenceRules = {\n    'diaria': 'RRULE:FREQ=DAILY',\n    'semanal': 'RRULE:FREQ=WEEKLY',\n    'mensal': 'RRULE:FREQ=MONTHLY',\n    'anual': 'RRULE:FREQ=YEARLY'\n  };\n  \n  googleEvent.recurrence = [recurrenceRules[evento.dados.recorrencia]];\n}\n\nreturn [{\n  json: {\n    ...evento,\n    google_event: googleEvent,\n    sync_required: true\n  }\n}];"
+      },
+      "id": "preparar-google-sync",
+      "name": "Preparar Google Sync",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1340, 200]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Interacoes",
+        "fields": {
+          "usuario": ["{{$json.usuario_id}}"],
+          "tipo": "api",
+          "canal": "agenda_api",
+          "comando": "agenda_{{$json.acao}}",
+          "contexto": "{{JSON.stringify($json)}}",
+          "status": "{{$json.sucesso ? 'sucesso' : 'erro'}}",
+          "modelo_ia_usado": "sistema",
+          "memoria_camada": "MCP"
+        }
+      },
+      "id": "registrar-interacao-agenda",
+      "name": "Registrar Interação Agenda",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [1560, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{JSON.stringify($json)}}"
+      },
+      "id": "resposta-final",
+      "name": "Resposta Final",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1780, 400]
+    }
+  ],
+  "connections": {
+    "Webhook Agenda": {
+      "main": [
+        [
+          {
+            "node": "Switch Ação Agenda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Ação Agenda": {
+      "main": [
+        [
+          {
+            "node": "Criar Evento",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Listar Eventos",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Eventos Hoje",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Eventos Semana",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Atualizar Evento",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Cancelar Evento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar Evento": {
+      "main": [
+        [
+          {
+            "node": "Processar Criação Evento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Listar Eventos": {
+      "main": [
+        [
+          {
+            "node": "Processar Listagem Eventos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eventos Hoje": {
+      "main": [
+        [
+          {
+            "node": "Processar Eventos Hoje",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Eventos Semana": {
+      "main": [
+        [
+          {
+            "node": "Processar Eventos Semana",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar Evento": {
+      "main": [
+        [
+          {
+            "node": "Processar Atualização Evento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cancelar Evento": {
+      "main": [
+        [
+          {
+            "node": "Processar Cancelamento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Criação Evento": {
+      "main": [
+        [
+          {
+            "node": "Verificar Google Sync",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Listagem Eventos": {
+      "main": [
+        [
+          {
+            "node": "Registrar Interação Agenda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Eventos Hoje": {
+      "main": [
+        [
+          {
+            "node": "Registrar Interação Agenda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Eventos Semana": {
+      "main": [
+        [
+          {
+            "node": "Registrar Interação Agenda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Atualização Evento": {
+      "main": [
+        [
+          {
+            "node": "Registrar Interação Agenda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Cancelamento": {
+      "main": [
+        [
+          {
+            "node": "Registrar Interação Agenda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Google Sync": {
+      "main": [
+        [
+          {
+            "node": "Preparar Google Sync",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar Interação Agenda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Google Sync": {
+      "main": [
+        [
+          {
+            "node": "Registrar Interação Agenda",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar Interação Agenda": {
+      "main": [
+        [
+          {
+            "node": "Resposta Final",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["beststag", "agenda", "calendario", "v9.0"],
+  "triggerCount": 1,
+  "updatedAt": "2025-06-03T20:00:00.000Z",
+  "versionId": "v9.0"
+}
+

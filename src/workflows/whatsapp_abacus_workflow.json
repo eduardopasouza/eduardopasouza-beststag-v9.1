@@ -1,0 +1,286 @@
+{
+  "name": "BestStag WhatsApp + Abacus.AI v9.1",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-in",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-whatsapp",
+      "name": "Webhook WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "whatsapp-webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json[\"Body\"]}}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "validate-message",
+      "name": "Validar Mensagem",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "operation": "sentiment",
+        "prompt": "={{$json[\"Body\"]}}"
+      },
+      "id": "analyze-sentiment",
+      "name": "Analisar Sentimento",
+      "type": "custom.abacusAI",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{$json[\"sentiment\"]}}",
+              "rightValue": "negative",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-sentiment",
+      "name": "Verificar Sentimento",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "operation": "chat",
+        "model": "claude",
+        "prompt": "Você é o BestStag, um assistente empático. O usuário está demonstrando sentimento negativo. Responda de forma compreensiva e ofereça ajuda prática. Mensagem do usuário: {{$node[\"Webhook WhatsApp\"].json[\"Body\"]}}"
+      },
+      "id": "empathetic-response",
+      "name": "Resposta Empática",
+      "type": "custom.abacusAI",
+      "typeVersion": 1,
+      "position": [1120, 200]
+    },
+    {
+      "parameters": {
+        "operation": "chat",
+        "model": "gpt-4",
+        "prompt": "Você é o BestStag, um assistente virtual inteligente. Analise a mensagem do usuário e determine se é: 1) Criação de tarefa, 2) Agendamento, 3) Consulta, 4) Comando. Responda de forma natural e útil. Mensagem: {{$node[\"Webhook WhatsApp\"].json[\"Body\"]}}"
+      },
+      "id": "normal-processing",
+      "name": "Processamento Normal",
+      "type": "custom.abacusAI",
+      "typeVersion": 1,
+      "position": [1120, 400]
+    },
+    {
+      "parameters": {
+        "operation": "agent",
+        "agentId": "beststag-assistant",
+        "prompt": "Execute a ação apropriada baseada na análise: {{$json[\"response\"]}}. Contexto da mensagem original: {{$node[\"Webhook WhatsApp\"].json[\"Body\"]}}"
+      },
+      "id": "execute-actions",
+      "name": "Executar Ações",
+      "type": "custom.abacusAI",
+      "typeVersion": 1,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "from": "whatsapp:+14155238886",
+        "to": "={{$node[\"Webhook WhatsApp\"].json[\"From\"]}}",
+        "message": "={{$json[\"response\"] || $json[\"result\"] || 'Desculpe, não consegui processar sua mensagem. Tente novamente.'}}"
+      },
+      "id": "send-whatsapp",
+      "name": "Enviar WhatsApp",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "OK"
+      },
+      "id": "respond-webhook",
+      "name": "Responder Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1780, 300]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "from": "whatsapp:+14155238886",
+        "to": "={{$node[\"Webhook WhatsApp\"].json[\"From\"]}}",
+        "message": "Desculpe, ocorreu um erro ao processar sua mensagem. Nossa equipe foi notificada."
+      },
+      "id": "error-response",
+      "name": "Resposta de Erro",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [680, 500]
+    }
+  ],
+  "connections": {
+    "Webhook WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Validar Mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validar Mensagem": {
+      "main": [
+        [
+          {
+            "node": "Analisar Sentimento",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resposta de Erro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analisar Sentimento": {
+      "main": [
+        [
+          {
+            "node": "Verificar Sentimento",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Sentimento": {
+      "main": [
+        [
+          {
+            "node": "Resposta Empática",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Processamento Normal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resposta Empática": {
+      "main": [
+        [
+          {
+            "node": "Enviar WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processamento Normal": {
+      "main": [
+        [
+          {
+            "node": "Executar Ações",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Executar Ações": {
+      "main": [
+        [
+          {
+            "node": "Enviar WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar WhatsApp": {
+      "main": [
+        [
+          {
+            "node": "Responder Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resposta de Erro": {
+      "main": [
+        [
+          {
+            "node": "Responder Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-06-04T00:00:00.000Z",
+  "versionId": "1"
+}
+

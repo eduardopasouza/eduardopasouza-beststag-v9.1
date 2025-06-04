@@ -1,0 +1,493 @@
+{
+  "name": "BestStag v9.0 - Gestão de Tarefas",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "tarefas",
+        "options": {}
+      },
+      "id": "webhook-tarefas",
+      "name": "Webhook Tarefas",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "beststag-tarefas"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.acao}}",
+              "operation": "equal",
+              "value2": "criar"
+            }
+          ]
+        }
+      },
+      "id": "switch-acao",
+      "name": "Switch Ação",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "parameters": {
+        "options": {
+          "allMatchingOutputs": false
+        },
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.acao}}",
+              "operation": "equal",
+              "value2": "criar"
+            },
+            {
+              "value1": "={{$json.acao}}",
+              "operation": "equal",
+              "value2": "listar"
+            },
+            {
+              "value1": "={{$json.acao}}",
+              "operation": "equal",
+              "value2": "concluir"
+            },
+            {
+              "value1": "={{$json.acao}}",
+              "operation": "equal",
+              "value2": "atualizar"
+            },
+            {
+              "value1": "={{$json.acao}}",
+              "operation": "equal",
+              "value2": "deletar"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Tarefas",
+        "fields": {
+          "usuario": ["{{$json.usuario_id}}"],
+          "titulo": "{{$json.titulo}}",
+          "descricao": "{{$json.descricao || ''}}",
+          "status": "pendente",
+          "prioridade": "{{$json.prioridade || 'media'}}",
+          "categoria": "{{$json.categoria || 'trabalho'}}",
+          "data_vencimento": "{{$json.data_vencimento || ''}}",
+          "estimativa_horas": "{{$json.estimativa_horas || 1}}",
+          "tags": "{{$json.tags || []}}"
+        }
+      },
+      "id": "criar-tarefa",
+      "name": "Criar Tarefa",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Tarefas",
+        "filterByFormula": "AND(usuario = '{{$json.usuario_id}}', OR(status = 'pendente', status = 'em_andamento'))",
+        "sort": [
+          {
+            "field": "prioridade",
+            "direction": "desc"
+          },
+          {
+            "field": "data_vencimento",
+            "direction": "asc"
+          }
+        ]
+      },
+      "id": "listar-tarefas",
+      "name": "Listar Tarefas",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Tarefas",
+        "id": "={{$json.tarefa_id}}",
+        "fields": {
+          "status": "concluida",
+          "data_conclusao": "={{new Date().toISOString().split('T')[0]}}",
+          "progresso": 100
+        }
+      },
+      "id": "concluir-tarefa",
+      "name": "Concluir Tarefa",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Tarefas",
+        "id": "={{$json.tarefa_id}}",
+        "fields": "={{$json.campos_atualizacao}}"
+      },
+      "id": "atualizar-tarefa",
+      "name": "Atualizar Tarefa",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [680, 500]
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Tarefas",
+        "id": "={{$json.tarefa_id}}"
+      },
+      "id": "deletar-tarefa",
+      "name": "Deletar Tarefa",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [680, 600]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar resposta da criação de tarefa\nconst tarefa = $input.first().json;\n\nconst resposta = {\n  sucesso: true,\n  mensagem: `✅ Tarefa criada com sucesso!\\n\\n` +\n            `📋 *${tarefa.fields.titulo}*\\n` +\n            `🎯 Prioridade: ${tarefa.fields.prioridade}\\n` +\n            `📂 Categoria: ${tarefa.fields.categoria}\\n` +\n            `📅 Vencimento: ${tarefa.fields.data_vencimento || 'Não definido'}\\n` +\n            `⏱️ Estimativa: ${tarefa.fields.estimativa_horas}h\\n\\n` +\n            `ID: ${tarefa.id}`,\n  tarefa_id: tarefa.id,\n  dados: tarefa.fields\n};\n\nreturn [{ json: resposta }];"
+      },
+      "id": "processar-criacao",
+      "name": "Processar Criação",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar lista de tarefas\nconst tarefas = $input.first().json.records || [];\n\nif (tarefas.length === 0) {\n  return [{\n    json: {\n      sucesso: true,\n      mensagem: `📋 *Suas Tarefas*\\n\\n` +\n                `🎉 Parabéns! Você não tem tarefas pendentes.\\n\\n` +\n                `Use */tarefa criar [descrição]* para adicionar uma nova tarefa.`,\n      total: 0\n    }\n  }];\n}\n\nlet mensagem = `📋 *Suas Tarefas Pendentes* (${tarefas.length})\\n\\n`;\n\ntarefas.forEach((tarefa, index) => {\n  const prioridadeIcon = {\n    'urgente': '🔴',\n    'alta': '🟠', \n    'media': '🟡',\n    'baixa': '🟢'\n  }[tarefa.fields.prioridade] || '⚪';\n  \n  const statusIcon = {\n    'pendente': '⏳',\n    'em_andamento': '🔄',\n    'concluida': '✅'\n  }[tarefa.fields.status] || '❓';\n  \n  const vencimento = tarefa.fields.data_vencimento ? \n    ` (📅 ${new Date(tarefa.fields.data_vencimento).toLocaleDateString('pt-BR')})` : '';\n  \n  mensagem += `${index + 1}. ${prioridadeIcon} ${statusIcon} ${tarefa.fields.titulo}${vencimento}\\n`;\n  \n  if (tarefa.fields.progresso > 0) {\n    mensagem += `   📊 Progresso: ${tarefa.fields.progresso}%\\n`;\n  }\n  \n  mensagem += `\\n`;\n});\n\nmensagem += `💡 Use */tarefa concluir [número]* para marcar como concluída.\\n`;\nmensagem += `⚙️ Use */tarefa atualizar [número]* para editar.`;\n\nreturn [{\n  json: {\n    sucesso: true,\n    mensagem: mensagem,\n    total: tarefas.length,\n    tarefas: tarefas\n  }\n}];"
+      },
+      "id": "processar-listagem",
+      "name": "Processar Listagem",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar conclusão de tarefa\nconst tarefa = $input.first().json;\n\nconst resposta = {\n  sucesso: true,\n  mensagem: `✅ *Tarefa Concluída!*\\n\\n` +\n            `📋 ${tarefa.fields.titulo}\\n` +\n            `📅 Concluída em: ${new Date().toLocaleDateString('pt-BR')}\\n\\n` +\n            `🎉 Parabéns! Continue assim!`,\n  tarefa_id: tarefa.id\n};\n\nreturn [{ json: resposta }];"
+      },
+      "id": "processar-conclusao",
+      "name": "Processar Conclusão",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar atualização de tarefa\nconst tarefa = $input.first().json;\n\nconst resposta = {\n  sucesso: true,\n  mensagem: `🔄 *Tarefa Atualizada!*\\n\\n` +\n            `📋 ${tarefa.fields.titulo}\\n` +\n            `🎯 Status: ${tarefa.fields.status}\\n` +\n            `📊 Progresso: ${tarefa.fields.progresso || 0}%\\n\\n` +\n            `✨ Alterações salvas com sucesso!`,\n  tarefa_id: tarefa.id\n};\n\nreturn [{ json: resposta }];"
+      },
+      "id": "processar-atualizacao",
+      "name": "Processar Atualização",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [900, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar exclusão de tarefa\nconst resposta = {\n  sucesso: true,\n  mensagem: `🗑️ *Tarefa Excluída*\\n\\n` +\n            `A tarefa foi removida permanentemente.\\n\\n` +\n            `⚠️ Esta ação não pode ser desfeita.`,\n  tarefa_id: $input.first().json.tarefa_id\n};\n\nreturn [{ json: resposta }];"
+      },
+      "id": "processar-exclusao",
+      "name": "Processar Exclusão",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [900, 600]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Interacoes",
+        "fields": {
+          "usuario": ["{{$json.usuario_id}}"],
+          "tipo": "api",
+          "canal": "tarefa_api",
+          "comando": "tarefa_{{$json.acao}}",
+          "contexto": "{{JSON.stringify($json)}}",
+          "status": "{{$json.sucesso ? 'sucesso' : 'erro'}}",
+          "modelo_ia_usado": "sistema",
+          "memoria_camada": "MCP"
+        }
+      },
+      "id": "registrar-interacao",
+      "name": "Registrar Interação",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [1120, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Análise inteligente de tarefas para sugestões\nconst acao = $input.first().json.acao;\nconst dados = $input.first().json;\n\nlet sugestoes = [];\n\n// Sugestões baseadas na ação\nswitch(acao) {\n  case 'criar':\n    // Analisar título para sugerir categoria e prioridade\n    const titulo = dados.titulo.toLowerCase();\n    \n    if (titulo.includes('urgente') || titulo.includes('asap') || titulo.includes('hoje')) {\n      sugestoes.push('Detectei urgência - prioridade definida como ALTA');\n    }\n    \n    if (titulo.includes('cliente') || titulo.includes('proposta') || titulo.includes('reunião')) {\n      sugestoes.push('Categoria sugerida: TRABALHO');\n    }\n    \n    if (titulo.includes('casa') || titulo.includes('pessoal') || titulo.includes('família')) {\n      sugestoes.push('Categoria sugerida: PESSOAL');\n    }\n    \n    // Sugerir estimativa baseada em palavras-chave\n    if (titulo.includes('revisar') || titulo.includes('ler')) {\n      sugestoes.push('Estimativa sugerida: 1-2 horas');\n    } else if (titulo.includes('criar') || titulo.includes('desenvolver')) {\n      sugestoes.push('Estimativa sugerida: 3-4 horas');\n    }\n    \n    break;\n    \n  case 'listar':\n    // Analisar padrões nas tarefas listadas\n    const tarefas = dados.tarefas || [];\n    const totalPendentes = tarefas.length;\n    \n    if (totalPendentes > 10) {\n      sugestoes.push('💡 Você tem muitas tarefas pendentes. Considere priorizar as mais importantes.');\n    }\n    \n    const tarefasVencidas = tarefas.filter(t => \n      t.fields.data_vencimento && new Date(t.fields.data_vencimento) < new Date()\n    ).length;\n    \n    if (tarefasVencidas > 0) {\n      sugestoes.push(`⚠️ Você tem ${tarefasVencidas} tarefa(s) vencida(s). Priorize-as!`);\n    }\n    \n    break;\n}\n\n// Adicionar sugestões de produtividade\nconst horaAtual = new Date().getHours();\nif (horaAtual >= 9 && horaAtual <= 11) {\n  sugestoes.push('🌅 Manhã é ideal para tarefas que exigem mais concentração!');\n} else if (horaAtual >= 14 && horaAtual <= 16) {\n  sugestoes.push('☀️ Tarde é boa para reuniões e tarefas colaborativas!');\n}\n\nreturn [{\n  json: {\n    ...dados,\n    sugestoes: sugestoes,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "analise-inteligente",
+      "name": "Análise Inteligente",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1340, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.sucesso}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "verificar-sucesso",
+      "name": "Verificar Sucesso",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1560, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{JSON.stringify($json)}}"
+      },
+      "id": "resposta-sucesso",
+      "name": "Resposta Sucesso",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1780, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{JSON.stringify({sucesso: false, erro: $json.erro || 'Erro interno', codigo: 500})}}"
+      },
+      "id": "resposta-erro",
+      "name": "Resposta Erro",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1780, 400]
+    }
+  ],
+  "connections": {
+    "Webhook Tarefas": {
+      "main": [
+        [
+          {
+            "node": "Switch Ação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Ação": {
+      "main": [
+        [
+          {
+            "node": "Criar Tarefa",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Listar Tarefas",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Concluir Tarefa",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Atualizar Tarefa",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Deletar Tarefa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Criar Tarefa": {
+      "main": [
+        [
+          {
+            "node": "Processar Criação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Listar Tarefas": {
+      "main": [
+        [
+          {
+            "node": "Processar Listagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Concluir Tarefa": {
+      "main": [
+        [
+          {
+            "node": "Processar Conclusão",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar Tarefa": {
+      "main": [
+        [
+          {
+            "node": "Processar Atualização",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Deletar Tarefa": {
+      "main": [
+        [
+          {
+            "node": "Processar Exclusão",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Criação": {
+      "main": [
+        [
+          {
+            "node": "Análise Inteligente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Listagem": {
+      "main": [
+        [
+          {
+            "node": "Análise Inteligente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Conclusão": {
+      "main": [
+        [
+          {
+            "node": "Análise Inteligente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Atualização": {
+      "main": [
+        [
+          {
+            "node": "Análise Inteligente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Exclusão": {
+      "main": [
+        [
+          {
+            "node": "Análise Inteligente",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Análise Inteligente": {
+      "main": [
+        [
+          {
+            "node": "Registrar Interação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar Interação": {
+      "main": [
+        [
+          {
+            "node": "Verificar Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verificar Sucesso": {
+      "main": [
+        [
+          {
+            "node": "Resposta Sucesso",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resposta Erro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["beststag", "tarefas", "v9.0", "crud"],
+  "triggerCount": 1,
+  "updatedAt": "2025-06-03T20:00:00.000Z",
+  "versionId": "v9.0"
+}
+
