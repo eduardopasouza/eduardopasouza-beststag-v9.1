@@ -1,6 +1,6 @@
 {
   "name": "beststag-v9.1",
-  "version": "9.1.0",
+  "version": "9.1.1",
   "description": "BestStag v9.1 + Abacus.AI - Assistente Virtual Inteligente com IA Contextual",
   "main": "src/backend/app.py",
   "scripts": {

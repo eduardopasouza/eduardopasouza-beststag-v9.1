@@ -15,6 +15,7 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 import uvicorn
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -30,7 +31,7 @@ from src.python.intelligent_reports import IntelligentReportGenerator
 # Imports das integrações otimizadas
 try:
     from src.integrations.abacus import initialize_client as init_abacus_client
-    from src.integrations.whatsapp import initialize_webhook, initialize_queue
+    from src.integrations.whatsapp import initialize_webhook, initialize_queue, send_whatsapp_message_via_twilio
     from src.integrations.common import initialize_metrics
     OPTIMIZED_INTEGRATIONS_AVAILABLE = True
 except ImportError:
@@ -62,17 +63,41 @@ async def lifespan(app: FastAPI):
                 rate_limit=int(os.getenv('WHATSAPP_RATE_LIMIT', '100'))
             )
 
+            async def process_incoming_text(message_payload: Dict[str, Any]):
+                user_number = message_payload.get("from")
+                text = message_payload.get("content", {}).get("text") or message_payload.get("text", "")
+                response_text = "Desculpe, não entendi."
+                try:
+                    abacus = app.state.abacus_client
+                    result = await abacus.process_message(message=text, user_id=user_number, conversation_id=None, channel="whatsapp")
+                    if isinstance(result, dict):
+                        response_text = result.get("content") or result.get("response") or response_text
+                except Exception as e:
+                    logger.error(f"Erro ao gerar resposta de IA: {e}")
+                try:
+                    await send_whatsapp_message_via_twilio(user_number, response_text)
+                    logger.info(f"Resposta enviada para {user_number}: {response_text}")
+                except Exception as e:
+                    logger.error(f"Falha ao enviar mensagem via Twilio: {e}")
+
+            app.state.whatsapp_queue.register_handler('text', process_incoming_text)
+            app.state.whatsapp_queue.register_handler('default', process_incoming_text)
+
             webhook_secret = os.getenv('WHATSAPP_WEBHOOK_SECRET')
             verify_token = os.getenv('WHATSAPP_VERIFY_TOKEN')
             if webhook_secret and verify_token:
                 app.state.whatsapp_webhook = initialize_webhook(
                     webhook_secret=webhook_secret,
                     verify_token=verify_token,
-                    queue=app.state.whatsapp_queue
+                    queue=app.state.whatsapp_queue,
+                    enable_signature_validation=False
                 )
+                app.state.whatsapp_webhook.setup_routes(app, webhook_path="/webhook/whatsapp")
                 logger.info("Webhook WhatsApp configurado")
             else:
                 logger.warning("Credenciais WhatsApp não configuradas")
+
+            await app.state.whatsapp_queue.start()
         else:
             logger.info("Usando integrações padrão...")
             app.state.abacus_client = create_abacus_client(use_optimized=False)
@@ -96,7 +121,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="BestStag v9.1 API",
     description="Assistente Virtual Inteligente com IA Contextual",
-    version="9.1.0",
+    version="9.1.1",
     docs_url="/docs",
     redoc_url="/redoc",
     lifespan=lifespan
@@ -177,7 +202,7 @@ async def detailed_health_check():
 async def root():
     return {
         "message": "BestStag v9.1 API",
-        "version": "9.1.0",
+        "version": "9.1.1",
         "status": "running",
         "timestamp": datetime.utcnow().isoformat() + 'Z'
     }
@@ -187,7 +212,7 @@ async def root():
 async def api_info():
     return {
         "name": "BestStag",
-        "version": "9.1.0",
+        "version": "9.1.1",
         "description": "Assistente Virtual Inteligente com IA Contextual",
         "features": [
             "Integração Abacus.AI",
@@ -235,6 +260,22 @@ async def chat_endpoint(
     except Exception as e:
         logger.error(f"Erro no processamento do chat: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class SentimentPayload(BaseModel):
+    text: str
+
+
+@app.post("/api/sentiment")
+async def analyze_sentiment(payload: SentimentPayload):
+    text = payload.text.lower()
+    if any(word in text for word in ["bom", "ótimo", "obrigado", "feliz"]):
+        sentiment = "positive"; confidence = 0.9
+    elif any(word in text for word in ["ruim", "triste", "ódio", "raiva"]):
+        sentiment = "negative"; confidence = 0.9
+    else:
+        sentiment = "neutral"; confidence = 0.7
+    return {"sentiment": sentiment, "confidence": confidence}
 
 
 @app.get("/api/memory/{user_id}")

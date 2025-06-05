@@ -4,7 +4,7 @@ BestStag v9.1 - Módulo de Integrações Otimizadas
 Contém todas as integrações críticas com sistemas externos
 """
 
-__version__ = "9.1.0"
+__version__ = "9.1.1"
 __author__ = "BestStag Team"
 
 from .abacus import AbacusOptimizedClient, IntelligentCache, CircuitBreaker

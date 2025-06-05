@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 
 // Configuração da API
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 // Tipos TypeScript
 interface SentimentResult {
@@ -55,7 +55,7 @@ export function useSentiment(text: string, debounceMs: number = 500) {
       setError(null);
       
       try {
-        const response = await axios.post(`${API_BASE_URL}/ai/sentiment`, { text });
+        const response = await axios.post(`${API_BASE_URL}/api/sentiment`, { text });
         setSentiment(response.data);
       } catch (err) {
         setError('Erro ao analisar sentimento');
@@ -92,7 +92,7 @@ export function useIntelligentChat(userId: string) {
     setMessages(prev => [...prev, userMessage]);
     
     try {
-      const response = await axios.post(`${API_BASE_URL}/ai/chat`, {
+      const response = await axios.post(`${API_BASE_URL}/api/chat`, {
         message,
         userId,
         context,
@@ -158,7 +158,7 @@ export function useSmartAutocomplete(input: string, category?: string) {
       
       try {
         const response = await axios.post(
-          `${API_BASE_URL}/ai/autocomplete`,
+          `${API_BASE_URL}/api/autocomplete`,
           { input, category },
           { signal: controller.signal }
         );
@@ -196,7 +196,7 @@ export function useAIInsights(data: any, refreshInterval: number = 30000) {
     setLoading(true);
     
     try {
-      const response = await axios.post(`${API_BASE_URL}/ai/insights`, {
+      const response = await axios.post(`${API_BASE_URL}/api/insights`, {
         data,
         timestamp: new Date().toISOString()
       });
@@ -236,7 +236,7 @@ export function useContextualAssistant(userId: string) {
     setLoading(true);
     
     try {
-      const response = await axios.post(`${API_BASE_URL}/ai/context`, {
+      const response = await axios.post(`${API_BASE_URL}/api/context`, {
         userId,
         context: newContext,
         timestamp: new Date().toISOString()
@@ -253,7 +253,7 @@ export function useContextualAssistant(userId: string) {
   
   const getSuggestions = useCallback(async (currentActivity: string) => {
     try {
-      const response = await axios.post(`${API_BASE_URL}/ai/suggestions`, {
+      const response = await axios.post(`${API_BASE_URL}/api/suggestions`, {
         userId,
         activity: currentActivity,
         context
@@ -284,7 +284,7 @@ export function useProductivityAnalysis(userId: string, timeframe: string = '7d'
     setLoading(true);
     
     try {
-      const response = await axios.post(`${API_BASE_URL}/ai/productivity`, {
+      const response = await axios.post(`${API_BASE_URL}/api/productivity`, {
         userId,
         timeframe
       });
@@ -319,7 +319,7 @@ export function usePersonalizedRecommendations(userId: string) {
     setLoading(true);
     
     try {
-      const response = await axios.post(`${API_BASE_URL}/ai/recommendations`, {
+      const response = await axios.post(`${API_BASE_URL}/api/recommendations`, {
         userId,
         context,
         timestamp: new Date().toISOString()
@@ -335,7 +335,7 @@ export function usePersonalizedRecommendations(userId: string) {
   
   const markAsUsed = useCallback(async (recommendationId: string) => {
     try {
-      await axios.post(`${API_BASE_URL}/ai/recommendations/${recommendationId}/used`);
+      await axios.post(`${API_BASE_URL}/api/recommendations/${recommendationId}/used`);
       
       // Atualizar estado local
       setRecommendations(prev => 
@@ -373,7 +373,7 @@ export function useWellbeingMonitor(userId: string) {
     setLoading(true);
     
     try {
-      const response = await axios.post(`${API_BASE_URL}/ai/wellbeing`, {
+      const response = await axios.post(`${API_BASE_URL}/api/wellbeing`, {
         userId,
         data,
         timestamp: new Date().toISOString()
