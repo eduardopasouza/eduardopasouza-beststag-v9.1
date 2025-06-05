@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BestStag - Relatório Semanal de Produtividade</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 700px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8fafc;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+            color: white;
+            padding: 24px;
+            border-radius: 8px;
+            margin: -32px -32px 32px -32px;
+        }
+        .logo {
+            font-size: 32px;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        .period {
+            font-size: 18px;
+            opacity: 0.9;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin: 32px 0;
+        }
+        .summary-card {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #e2e8f0;
+        }
+        .summary-number {
+            font-size: 28px;
+            font-weight: bold;
+            color: #3b82f6;
+            margin-bottom: 4px;
+        }
+        .summary-label {
+            font-size: 14px;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .section {
+            margin: 32px 0;
+            padding: 24px;
+            background: #f8fafc;
+            border-radius: 8px;
+            border-left: 4px solid #3b82f6;
+        }
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+        }
+        .section-icon {
+            margin-right: 8px;
+            font-size: 24px;
+        }
+        .progress-bar {
+            background: #e2e8f0;
+            height: 12px;
+            border-radius: 6px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #10b981, #059669);
+            transition: width 0.3s ease;
+        }
+        .task-list {
+            list-style: none;
+            padding: 0;
+        }
+        .task-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .task-item:last-child {
+            border-bottom: none;
+        }
+        .task-status {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+        .task-completed {
+            background: #10b981;
+            color: white;
+        }
+        .task-pending {
+            background: #f59e0b;
+            color: white;
+        }
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 16px 0;
+            border: 1px solid #e2e8f0;
+        }
+        .chart-bar {
+            display: flex;
+            align-items: center;
+            margin: 12px 0;
+        }
+        .chart-label {
+            width: 100px;
+            font-size: 14px;
+            color: #64748b;
+        }
+        .chart-bar-fill {
+            height: 20px;
+            background: #3b82f6;
+            border-radius: 4px;
+            margin: 0 12px;
+            min-width: 20px;
+        }
+        .chart-value {
+            font-size: 14px;
+            font-weight: 500;
+            color: #1e293b;
+        }
+        .insights {
+            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+            border: 1px solid #0ea5e9;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 24px 0;
+        }
+        .insights-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #0c4a6e;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+        }
+        .insights-list {
+            list-style: none;
+            padding: 0;
+        }
+        .insights-item {
+            padding: 8px 0;
+            color: #0c4a6e;
+            display: flex;
+            align-items: flex-start;
+        }
+        .insights-icon {
+            margin-right: 8px;
+            margin-top: 2px;
+        }
+        .goals {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            border: 1px solid #f59e0b;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 24px 0;
+        }
+        .goals-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #92400e;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 2px solid #e2e8f0;
+            color: #64748b;
+            font-size: 14px;
+        }
+        .cta-buttons {
+            text-align: center;
+            margin: 32px 0;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #3b82f6;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            margin: 0 8px;
+        }
+        .btn-secondary {
+            background: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">📊 BestStag Relatório Semanal</div>
+            <div class="period">{{week_start}} - {{week_end}}</div>
+        </div>
+
+        <!-- Resumo Geral -->
+        <div class="summary-grid">
+            <div class="summary-card">
+                <div class="summary-number">{{tasks_completed}}</div>
+                <div class="summary-label">Tarefas Concluídas</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number">{{events_attended}}</div>
+                <div class="summary-label">Eventos Participados</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number">{{productivity_score}}%</div>
+                <div class="summary-label">Produtividade</div>
+            </div>
+            <div class="summary-card">
+                <div class="summary-number">{{total_interactions}}</div>
+                <div class="summary-label">Interações</div>
+            </div>
+        </div>
+
+        <!-- Progresso das Metas -->
+        <div class="section">
+            <div class="section-title">
+                <span class="section-icon">🎯</span>
+                Progresso das Metas Semanais
+            </div>
+            
+            <div style="margin: 16px 0;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span>Meta de Tarefas ({{tasks_goal}})</span>
+                    <span>{{tasks_completed}}/{{tasks_goal}}</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: {{tasks_progress}}%;"></div>
+                </div>
+            </div>
+
+            <div style="margin: 16px 0;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                    <span>Meta de Produtividade ({{productivity_goal}}%)</span>
+                    <span>{{productivity_score}}%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: {{productivity_progress}}%;"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tarefas da Semana -->
+        <div class="section">
+            <div class="section-title">
+                <span class="section-icon">📋</span>
+                Resumo de Tarefas
+            </div>
+            
+            <ul class="task-list">
+                {{#each completed_tasks}}
+                <li class="task-item">
+                    <div class="task-status task-completed">✓</div>
+                    <div>
+                        <strong>{{title}}</strong><br>
+                        <small style="color: #64748b;">Concluída em {{completion_date}}</small>
+                    </div>
+                </li>
+                {{/each}}
+                
+                {{#each pending_tasks}}
+                <li class="task-item">
+                    <div class="task-status task-pending">⏳</div>
+                    <div>
+                        <strong>{{title}}</strong><br>
+                        <small style="color: #64748b;">Vence em {{due_date}}</small>
+                    </div>
+                </li>
+                {{/each}}
+            </ul>
+        </div>
+
+        <!-- Análise de Categorias -->
+        <div class="section">
+            <div class="section-title">
+                <span class="section-icon">📊</span>
+                Distribuição por Categoria
+            </div>
+            
+            <div class="chart-container">
+                {{#each category_stats}}
+                <div class="chart-bar">
+                    <div class="chart-label">{{name}}</div>
+                    <div class="chart-bar-fill" style="width: {{percentage}}%;"></div>
+                    <div class="chart-value">{{count}} ({{percentage}}%)</div>
+                </div>
+                {{/each}}
+            </div>
+        </div>
+
+        <!-- Insights e Análises -->
+        <div class="insights">
+            <div class="insights-title">
+                💡 Insights da Semana
+            </div>
+            <ul class="insights-list">
+                {{#each insights}}
+                <li class="insights-item">
+                    <span class="insights-icon">{{icon}}</span>
+                    {{text}}
+                </li>
+                {{/each}}
+            </ul>
+        </div>
+
+        <!-- Metas para Próxima Semana -->
+        <div class="goals">
+            <div class="goals-title">
+                🚀 Metas para Próxima Semana
+            </div>
+            <ul style="margin: 0; padding-left: 20px; color: #92400e;">
+                {{#each next_week_goals}}
+                <li>{{this}}</li>
+                {{/each}}
+            </ul>
+        </div>
+
+        <!-- Estatísticas de Tempo -->
+        <div class="section">
+            <div class="section-title">
+                <span class="section-icon">⏱️</span>
+                Análise de Tempo
+            </div>
+            
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                <div style="text-align: center; padding: 16px; background: white; border-radius: 8px;">
+                    <div style="font-size: 24px; font-weight: bold; color: #3b82f6;">{{avg_response_time}}h</div>
+                    <div style="font-size: 14px; color: #64748b;">Tempo Médio de Resposta</div>
+                </div>
+                <div style="text-align: center; padding: 16px; background: white; border-radius: 8px;">
+                    <div style="font-size: 24px; font-weight: bold; color: #10b981;">{{total_focus_time}}h</div>
+                    <div style="font-size: 14px; color: #64748b;">Tempo Total de Foco</div>
+                </div>
+                <div style="text-align: center; padding: 16px; background: white; border-radius: 8px;">
+                    <div style="font-size: 24px; font-weight: bold; color: #f59e0b;">{{peak_productivity_hour}}</div>
+                    <div style="font-size: 14px; color: #64748b;">Horário Mais Produtivo</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Botões de Ação -->
+        <div class="cta-buttons">
+            <a href="{{portal_url}}/dashboard" class="btn">
+                📊 Ver Dashboard Completo
+            </a>
+            <a href="{{portal_url}}/relatorios" class="btn btn-secondary">
+                📈 Relatórios Detalhados
+            </a>
+        </div>
+
+        <!-- Dicas de Produtividade -->
+        <div style="background: #f1f5f9; padding: 20px; border-radius: 8px; margin: 24px 0;">
+            <h3 style="margin: 0 0 16px 0; color: #1e293b;">💡 Dica da Semana</h3>
+            <p style="margin: 0; color: #475569; font-style: italic;">
+                "{{weekly_tip}}"
+            </p>
+        </div>
+
+        <div class="footer">
+            <p>
+                <strong>BestStag v9.0</strong> - Seu Assistente Virtual Inteligente<br>
+                Relatório gerado automaticamente em {{report_date}}
+            </p>
+            
+            <p style="margin-top: 16px;">
+                📱 WhatsApp: {{whatsapp_number}}<br>
+                🌐 Portal: <a href="{{portal_url}}">{{portal_url}}</a><br>
+                ⚙️ <a href="{{portal_url}}/configuracoes">Configurar Notificações</a>
+            </p>
+            
+            <p style="margin-top: 16px; font-size: 12px;">
+                © 2025 BestStag. Continue evoluindo sua produtividade! 🚀
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+

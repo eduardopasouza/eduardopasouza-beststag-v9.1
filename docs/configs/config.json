@@ -1,0 +1,316 @@
+{
+  "project": {
+    "name": "BestStag",
+    "version": "9.0",
+    "description": "Assistente Virtual Inteligente Consolidado",
+    "author": "Manus AI",
+    "license": "MIT",
+    "repository": "https://github.com/beststag/beststag-v9",
+    "homepage": "https://beststag.com",
+    "documentation": "https://docs.beststag.com"
+  },
+  "system": {
+    "environment": "production",
+    "debug": false,
+    "timezone": "America/Sao_Paulo",
+    "locale": "pt-BR",
+    "currency": "BRL",
+    "date_format": "DD/MM/YYYY",
+    "time_format": "HH:mm"
+  },
+  "features": {
+    "whatsapp_integration": {
+      "enabled": true,
+      "commands": [
+        "/ajuda",
+        "/status", 
+        "/tarefa",
+        "/agenda",
+        "/perfil",
+        "/relatório"
+      ],
+      "rate_limit": {
+        "max_messages_per_minute": 10,
+        "max_messages_per_hour": 100
+      }
+    },
+    "memory_system": {
+      "enabled": true,
+      "layers": {
+        "short_term": {
+          "duration_hours": 24,
+          "max_items": 100
+        },
+        "medium_term": {
+          "duration_days": 30,
+          "max_items": 500
+        },
+        "long_term": {
+          "duration_days": 365,
+          "max_items": 1000
+        }
+      }
+    },
+    "ai_models": {
+      "primary": "gpt-4",
+      "secondary": "claude-3-sonnet",
+      "fallback": "gpt-3.5-turbo",
+      "load_balancing": true,
+      "cost_optimization": true
+    },
+    "portal_web": {
+      "enabled": true,
+      "features": [
+        "dashboard",
+        "task_management",
+        "calendar",
+        "chat_interface",
+        "settings",
+        "analytics"
+      ]
+    },
+    "automations": {
+      "enabled": true,
+      "max_per_user": 10,
+      "types": [
+        "email_triaging",
+        "calendar_sync",
+        "task_creation",
+        "reminders",
+        "reports"
+      ]
+    }
+  },
+  "integrations": {
+    "airtable": {
+      "enabled": true,
+      "tables": {
+        "usuarios": "Usuarios",
+        "emails": "Emails", 
+        "eventos": "Eventos",
+        "tarefas": "Tarefas",
+        "interacoes": "Interacoes",
+        "configuracoes": "Configuracoes"
+      },
+      "sync_interval_minutes": 5
+    },
+    "google": {
+      "calendar": {
+        "enabled": true,
+        "sync_bidirectional": true,
+        "sync_interval_minutes": 15
+      },
+      "gmail": {
+        "enabled": true,
+        "auto_triaging": true,
+        "max_emails_per_sync": 50
+      }
+    },
+    "twilio": {
+      "whatsapp": {
+        "enabled": true,
+        "webhook_validation": true,
+        "message_status_tracking": true
+      }
+    }
+  },
+  "security": {
+    "authentication": {
+      "jwt": {
+        "algorithm": "HS256",
+        "expires_in": "24h"
+      },
+      "refresh_token": {
+        "expires_in": "7d"
+      },
+      "two_factor": {
+        "enabled": false,
+        "methods": ["sms", "email"]
+      }
+    },
+    "encryption": {
+      "data_at_rest": true,
+      "data_in_transit": true,
+      "algorithm": "AES-256"
+    },
+    "rate_limiting": {
+      "api": {
+        "window_ms": 900000,
+        "max_requests": 100
+      },
+      "whatsapp": {
+        "window_ms": 60000,
+        "max_messages": 10
+      }
+    }
+  },
+  "performance": {
+    "caching": {
+      "enabled": true,
+      "ttl_seconds": 3600,
+      "redis": {
+        "enabled": true,
+        "db": 0
+      }
+    },
+    "timeouts": {
+      "api_request": 30000,
+      "webhook": 10000,
+      "ai_processing": 60000
+    },
+    "limits": {
+      "max_concurrent_users": 1000,
+      "max_tasks_per_user": 500,
+      "max_events_per_user": 200
+    }
+  },
+  "monitoring": {
+    "logging": {
+      "level": "info",
+      "format": "json",
+      "retention_days": 30
+    },
+    "metrics": {
+      "enabled": true,
+      "collection_interval": 60,
+      "retention_days": 90
+    },
+    "alerts": {
+      "enabled": true,
+      "channels": ["email", "slack", "webhook"],
+      "thresholds": {
+        "error_rate": 0.05,
+        "response_time": 5000,
+        "uptime": 0.999
+      }
+    }
+  },
+  "backup": {
+    "enabled": true,
+    "frequency": "daily",
+    "retention_days": 30,
+    "compression": true,
+    "encryption": true,
+    "destinations": ["local", "cloud"]
+  },
+  "localization": {
+    "default_language": "pt-BR",
+    "supported_languages": [
+      "pt-BR",
+      "en-US",
+      "es-ES",
+      "fr-FR"
+    ],
+    "auto_detect": true
+  },
+  "business": {
+    "pricing": {
+      "free_tier": {
+        "max_users": 1,
+        "max_tasks": 50,
+        "max_events": 20,
+        "features": ["basic_commands", "simple_memory"]
+      },
+      "pro_tier": {
+        "price_monthly": 29.90,
+        "max_users": 5,
+        "max_tasks": 500,
+        "max_events": 200,
+        "features": ["all_commands", "advanced_memory", "portal_web", "integrations"]
+      },
+      "enterprise_tier": {
+        "price_monthly": 99.90,
+        "max_users": 50,
+        "max_tasks": 5000,
+        "max_events": 2000,
+        "features": ["unlimited", "custom_automations", "priority_support", "sla"]
+      }
+    },
+    "limits": {
+      "trial_period_days": 14,
+      "max_free_users": 10000,
+      "support_response_time_hours": 24
+    }
+  },
+  "development": {
+    "api": {
+      "version": "v1",
+      "base_url": "/api/v1",
+      "documentation_url": "/docs",
+      "rate_limit_bypass": false
+    },
+    "testing": {
+      "enabled": true,
+      "coverage_threshold": 80,
+      "e2e_tests": true
+    },
+    "deployment": {
+      "strategy": "blue_green",
+      "rollback_enabled": true,
+      "health_checks": true
+    }
+  },
+  "compliance": {
+    "gdpr": {
+      "enabled": true,
+      "data_retention_days": 2555,
+      "right_to_deletion": true
+    },
+    "lgpd": {
+      "enabled": true,
+      "data_protection_officer": "dpo@beststag.com",
+      "consent_management": true
+    },
+    "audit": {
+      "enabled": true,
+      "log_all_actions": true,
+      "retention_years": 7
+    }
+  },
+  "notifications": {
+    "email": {
+      "enabled": true,
+      "provider": "resend",
+      "templates": {
+        "welcome": "welcome_template",
+        "password_reset": "password_reset_template",
+        "task_reminder": "task_reminder_template"
+      }
+    },
+    "push": {
+      "enabled": false,
+      "provider": "firebase"
+    },
+    "sms": {
+      "enabled": false,
+      "provider": "twilio"
+    }
+  },
+  "analytics": {
+    "user_tracking": {
+      "enabled": true,
+      "anonymize_ip": true,
+      "cookie_consent": true
+    },
+    "business_metrics": {
+      "enabled": true,
+      "kpis": [
+        "daily_active_users",
+        "monthly_recurring_revenue",
+        "customer_acquisition_cost",
+        "lifetime_value",
+        "churn_rate"
+      ]
+    },
+    "performance_metrics": {
+      "enabled": true,
+      "metrics": [
+        "response_time",
+        "error_rate",
+        "throughput",
+        "uptime"
+      ]
+    }
+  }
+}
+

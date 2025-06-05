@@ -1,0 +1,74 @@
+
+# BestStag v9.1 - Regras de Alerta
+groups:
+  - name: beststag_alerts
+    rules:
+      # Alertas de Circuit Breaker
+      - alert: CircuitBreakerOpen
+        expr: circuit_breaker_state{state="open"} == 1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Circuit Breaker {{ $labels.name }} está aberto"
+          description: "O circuit breaker {{ $labels.name }} está aberto há mais de 1 minuto"
+
+      # Alertas de Rate Limit
+      - alert: HighRateLimitHits
+        expr: rate(integration_rate_limit_hits_total[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Alto número de hits de rate limit"
+          description: "Rate limit sendo atingido frequentemente: {{ $value }} hits/min"
+
+      # Alertas de Erro
+      - alert: HighErrorRate
+        expr: rate(integration_errors_total[5m]) / rate(integration_requests_total[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Taxa de erro alta na integração {{ $labels.integration }}"
+          description: "Taxa de erro: {{ $value | humanizePercentage }}"
+
+      # Alertas de Latência
+      - alert: HighLatency
+        expr: histogram_quantile(0.95, rate(integration_request_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Latência alta na integração {{ $labels.integration }}"
+          description: "P95 latência: {{ $value }}s"
+
+      # Alertas de Queue
+      - alert: QueueBacklog
+        expr: whatsapp_queue_pending_messages > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Backlog alto na queue WhatsApp"
+          description: "{{ $value }} mensagens pendentes na queue"
+
+      # Alertas de Cache
+      - alert: LowCacheHitRate
+        expr: cache_hit_rate_percent < 50
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Taxa de hit do cache baixa"
+          description: "Taxa de hit do cache: {{ $value }}%"
+
+      # Alertas de Conexão
+      - alert: IntegrationDown
+        expr: integration_connected == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Integração {{ $labels.integration }} desconectada"
+          description: "A integração {{ $labels.integration }} está desconectada há mais de 2 minutos"

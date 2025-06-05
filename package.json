@@ -1,0 +1,84 @@
+{
+  "name": "beststag-v9.1",
+  "version": "9.1.0",
+  "description": "BestStag v9.1 + Abacus.AI - Assistente Virtual Inteligente com IA Contextual",
+  "main": "src/backend/app.py",
+  "scripts": {
+    "start": "npm run frontend:start",
+    "dev": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "build": "npm run frontend:build",
+    "test": "npm run test:backend && npm run test:frontend",
+    "test:backend": "cd src/backend && python -m pytest ../../tests/",
+    "test:frontend": "cd src/frontend && npm test",
+    "frontend:dev": "cd src/frontend && npm start",
+    "frontend:build": "cd src/frontend && npm run build",
+    "frontend:start": "cd src/frontend && npm start",
+    "backend:dev": "cd src/backend && python app.py",
+    "backend:start": "cd src/backend && python app.py",
+    "install:all": "npm install && cd src/frontend && npm install",
+    "setup": "npm run install:all && pip install -r requirements.txt && pip install -r requirements_fase2.txt",
+    "validate": "python tests/test_final_v9.1.py",
+    "n8n:start": "n8n start",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "lint": "eslint src/frontend --ext .ts,.tsx && flake8 src/backend",
+    "format": "prettier --write src/frontend && black src/backend",
+    "docs:serve": "cd docs && python -m http.server 8080",
+    "clean": "rm -rf node_modules src/frontend/node_modules src/frontend/build dist __pycache__ .pytest_cache"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/seu-usuario/beststag-v9.1.git"
+  },
+  "keywords": [
+    "ai",
+    "assistant",
+    "automation",
+    "chatbot",
+    "productivity",
+    "abacus-ai",
+    "n8n",
+    "react",
+    "python",
+    "contextual-memory",
+    "intelligent-reports",
+    "sentiment-analysis"
+  ],
+  "author": "BestStag Team",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/seu-usuario/beststag-v9.1/issues"
+  },
+  "homepage": "https://github.com/seu-usuario/beststag-v9.1#readme",
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=9.0.0",
+    "python": ">=3.8.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.0",
+    "eslint": "^8.45.0",
+    "prettier": "^3.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "dotenv": "^16.3.0"
+  },
+  "peerDependencies": {
+    "react": ">=18.0.0",
+    "typescript": ">=5.0.0"
+  },
+  "config": {
+    "python_version": "3.11",
+    "node_version": "20",
+    "abacus_ai_version": "latest"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/beststag"
+  }
+}
+

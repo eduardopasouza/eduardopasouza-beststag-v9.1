@@ -1,0 +1,718 @@
+{
+  "airtable_schema": {
+    "version": "9.0",
+    "description": "Schema otimizado do Airtable para BestStag v9.0 - Baseado nas validações das versões Elaborando7",
+    "created_date": "2025-06-03",
+    "tables": {
+      "Usuarios": {
+        "description": "Tabela central de usuários - Hub principal do sistema",
+        "fields": {
+          "id": {
+            "type": "autonumber",
+            "description": "ID único do usuário",
+            "primary_key": true
+          },
+          "nome": {
+            "type": "single_line_text",
+            "description": "Nome completo do usuário",
+            "required": true,
+            "max_length": 100
+          },
+          "email": {
+            "type": "email",
+            "description": "Email principal do usuário",
+            "required": true,
+            "unique": true
+          },
+          "telefone": {
+            "type": "phone_number",
+            "description": "Número do WhatsApp",
+            "required": true,
+            "format": "+55 11 99999-9999"
+          },
+          "status": {
+            "type": "single_select",
+            "description": "Status do usuário",
+            "options": ["ativo", "inativo", "suspenso", "trial"],
+            "default": "trial"
+          },
+          "plano": {
+            "type": "single_select",
+            "description": "Plano de assinatura",
+            "options": ["free", "pro", "enterprise"],
+            "default": "free"
+          },
+          "data_criacao": {
+            "type": "created_time",
+            "description": "Data de criação do usuário"
+          },
+          "ultimo_acesso": {
+            "type": "last_modified_time",
+            "description": "Último acesso do usuário"
+          },
+          "configuracoes": {
+            "type": "long_text",
+            "description": "Configurações personalizadas em JSON",
+            "format": "json"
+          },
+          "fuso_horario": {
+            "type": "single_line_text",
+            "description": "Fuso horário do usuário",
+            "default": "America/Sao_Paulo"
+          },
+          "idioma": {
+            "type": "single_select",
+            "description": "Idioma preferido",
+            "options": ["pt-BR", "en-US", "es-ES"],
+            "default": "pt-BR"
+          },
+          "total_tarefas": {
+            "type": "count",
+            "description": "Total de tarefas criadas",
+            "linked_table": "Tarefas"
+          },
+          "total_eventos": {
+            "type": "count",
+            "description": "Total de eventos criados",
+            "linked_table": "Eventos"
+          },
+          "total_interacoes": {
+            "type": "count",
+            "description": "Total de interações",
+            "linked_table": "Interacoes"
+          },
+          "score_engajamento": {
+            "type": "formula",
+            "description": "Score de engajamento calculado",
+            "formula": "({total_interacoes} * 0.3) + ({total_tarefas} * 0.4) + ({total_eventos} * 0.3)"
+          },
+          "data_ultimo_backup": {
+            "type": "date",
+            "description": "Data do último backup dos dados"
+          }
+        },
+        "views": {
+          "todos_usuarios": {
+            "type": "grid",
+            "description": "Visualização de todos os usuários"
+          },
+          "usuarios_ativos": {
+            "type": "grid",
+            "description": "Apenas usuários ativos",
+            "filter": "status = 'ativo'"
+          },
+          "usuarios_trial": {
+            "type": "grid", 
+            "description": "Usuários em período trial",
+            "filter": "status = 'trial'"
+          }
+        }
+      },
+      "Emails": {
+        "description": "Gestão e triagem de emails",
+        "fields": {
+          "id": {
+            "type": "autonumber",
+            "description": "ID único do email",
+            "primary_key": true
+          },
+          "usuario": {
+            "type": "link_to_another_record",
+            "description": "Usuário proprietário",
+            "linked_table": "Usuarios",
+            "required": true
+          },
+          "remetente": {
+            "type": "email",
+            "description": "Email do remetente",
+            "required": true
+          },
+          "assunto": {
+            "type": "single_line_text",
+            "description": "Assunto do email",
+            "required": true,
+            "max_length": 200
+          },
+          "data_recebimento": {
+            "type": "date_time",
+            "description": "Data e hora de recebimento",
+            "required": true
+          },
+          "prioridade": {
+            "type": "single_select",
+            "description": "Prioridade do email",
+            "options": ["baixa", "media", "alta", "urgente"],
+            "default": "media"
+          },
+          "categoria": {
+            "type": "single_select",
+            "description": "Categoria do email",
+            "options": ["trabalho", "pessoal", "promocional", "spam", "importante"]
+          },
+          "status": {
+            "type": "single_select",
+            "description": "Status de processamento",
+            "options": ["nao_lido", "lido", "respondido", "arquivado"],
+            "default": "nao_lido"
+          },
+          "resumo_ia": {
+            "type": "long_text",
+            "description": "Resumo gerado por IA"
+          },
+          "tags": {
+            "type": "multiple_select",
+            "description": "Tags para categorização",
+            "options": ["cliente", "fornecedor", "reuniao", "proposta", "contrato", "urgente"]
+          },
+          "acao_sugerida": {
+            "type": "single_line_text",
+            "description": "Ação sugerida pela IA"
+          },
+          "tempo_resposta": {
+            "type": "formula",
+            "description": "Tempo desde recebimento em horas",
+            "formula": "DATETIME_DIFF(NOW(), {data_recebimento}, 'hours')"
+          },
+          "precisa_resposta": {
+            "type": "checkbox",
+            "description": "Email precisa de resposta"
+          },
+          "data_processamento": {
+            "type": "date_time",
+            "description": "Data de processamento pela IA"
+          }
+        },
+        "views": {
+          "emails_pendentes": {
+            "type": "grid",
+            "description": "Emails não processados",
+            "filter": "status = 'nao_lido'"
+          },
+          "alta_prioridade": {
+            "type": "grid",
+            "description": "Emails de alta prioridade",
+            "filter": "prioridade = 'alta' OR prioridade = 'urgente'"
+          },
+          "precisa_resposta": {
+            "type": "grid",
+            "description": "Emails que precisam de resposta",
+            "filter": "precisa_resposta = true"
+          }
+        }
+      },
+      "Eventos": {
+        "description": "Gestão de calendário e eventos",
+        "fields": {
+          "id": {
+            "type": "autonumber",
+            "description": "ID único do evento",
+            "primary_key": true
+          },
+          "usuario": {
+            "type": "link_to_another_record",
+            "description": "Usuário proprietário",
+            "linked_table": "Usuarios",
+            "required": true
+          },
+          "titulo": {
+            "type": "single_line_text",
+            "description": "Título do evento",
+            "required": true,
+            "max_length": 150
+          },
+          "descricao": {
+            "type": "long_text",
+            "description": "Descrição detalhada do evento"
+          },
+          "data_inicio": {
+            "type": "date_time",
+            "description": "Data e hora de início",
+            "required": true
+          },
+          "data_fim": {
+            "type": "date_time",
+            "description": "Data e hora de fim",
+            "required": true
+          },
+          "duracao_minutos": {
+            "type": "formula",
+            "description": "Duração em minutos",
+            "formula": "DATETIME_DIFF({data_fim}, {data_inicio}, 'minutes')"
+          },
+          "tipo": {
+            "type": "single_select",
+            "description": "Tipo de evento",
+            "options": ["reuniao", "tarefa", "compromisso", "lembrete", "bloqueio"],
+            "default": "reuniao"
+          },
+          "status": {
+            "type": "single_select",
+            "description": "Status do evento",
+            "options": ["agendado", "confirmado", "cancelado", "concluido"],
+            "default": "agendado"
+          },
+          "local": {
+            "type": "single_line_text",
+            "description": "Local do evento"
+          },
+          "participantes": {
+            "type": "long_text",
+            "description": "Lista de participantes"
+          },
+          "link_reuniao": {
+            "type": "url",
+            "description": "Link para reunião online"
+          },
+          "lembrete_minutos": {
+            "type": "number",
+            "description": "Lembrete em minutos antes",
+            "default": 15
+          },
+          "recorrencia": {
+            "type": "single_select",
+            "description": "Padrão de recorrência",
+            "options": ["nenhuma", "diaria", "semanal", "mensal", "anual"],
+            "default": "nenhuma"
+          },
+          "google_event_id": {
+            "type": "single_line_text",
+            "description": "ID do evento no Google Calendar"
+          },
+          "criado_por": {
+            "type": "single_select",
+            "description": "Origem da criação",
+            "options": ["whatsapp", "portal", "google_sync", "email"],
+            "default": "whatsapp"
+          },
+          "data_criacao": {
+            "type": "created_time",
+            "description": "Data de criação"
+          },
+          "proximidade": {
+            "type": "formula",
+            "description": "Proximidade do evento",
+            "formula": "IF(DATETIME_DIFF({data_inicio}, NOW(), 'hours') < 24, '🔴 Próximo', IF(DATETIME_DIFF({data_inicio}, NOW(), 'hours') < 72, '🟡 Esta semana', '🟢 Futuro'))"
+          }
+        },
+        "views": {
+          "proximos_eventos": {
+            "type": "calendar",
+            "description": "Calendário de próximos eventos",
+            "date_field": "data_inicio"
+          },
+          "hoje": {
+            "type": "grid",
+            "description": "Eventos de hoje",
+            "filter": "IS_SAME({data_inicio}, TODAY(), 'day')"
+          },
+          "esta_semana": {
+            "type": "grid",
+            "description": "Eventos desta semana",
+            "filter": "IS_SAME({data_inicio}, TODAY(), 'week')"
+          }
+        }
+      },
+      "Tarefas": {
+        "description": "Gestão de tarefas e projetos",
+        "fields": {
+          "id": {
+            "type": "autonumber",
+            "description": "ID único da tarefa",
+            "primary_key": true
+          },
+          "usuario": {
+            "type": "link_to_another_record",
+            "description": "Usuário proprietário",
+            "linked_table": "Usuarios",
+            "required": true
+          },
+          "titulo": {
+            "type": "single_line_text",
+            "description": "Título da tarefa",
+            "required": true,
+            "max_length": 150
+          },
+          "descricao": {
+            "type": "long_text",
+            "description": "Descrição detalhada da tarefa"
+          },
+          "status": {
+            "type": "single_select",
+            "description": "Status da tarefa",
+            "options": ["pendente", "em_andamento", "concluida", "cancelada"],
+            "default": "pendente"
+          },
+          "prioridade": {
+            "type": "single_select",
+            "description": "Prioridade da tarefa",
+            "options": ["baixa", "media", "alta", "urgente"],
+            "default": "media"
+          },
+          "categoria": {
+            "type": "single_select",
+            "description": "Categoria da tarefa",
+            "options": ["trabalho", "pessoal", "estudo", "saude", "financeiro", "casa"]
+          },
+          "data_criacao": {
+            "type": "created_time",
+            "description": "Data de criação"
+          },
+          "data_vencimento": {
+            "type": "date",
+            "description": "Data de vencimento"
+          },
+          "data_conclusao": {
+            "type": "date",
+            "description": "Data de conclusão"
+          },
+          "estimativa_horas": {
+            "type": "number",
+            "description": "Estimativa de tempo em horas",
+            "precision": 1
+          },
+          "tempo_gasto": {
+            "type": "number",
+            "description": "Tempo gasto em horas",
+            "precision": 1
+          },
+          "progresso": {
+            "type": "percent",
+            "description": "Percentual de progresso",
+            "default": 0
+          },
+          "tags": {
+            "type": "multiple_select",
+            "description": "Tags para organização",
+            "options": ["cliente", "projeto", "reuniao", "email", "ligacao", "documento"]
+          },
+          "evento_relacionado": {
+            "type": "link_to_another_record",
+            "description": "Evento relacionado",
+            "linked_table": "Eventos"
+          },
+          "email_origem": {
+            "type": "link_to_another_record",
+            "description": "Email que originou a tarefa",
+            "linked_table": "Emails"
+          },
+          "subtarefas": {
+            "type": "long_text",
+            "description": "Lista de subtarefas em JSON"
+          },
+          "anexos": {
+            "type": "multiple_attachments",
+            "description": "Arquivos anexos"
+          },
+          "dias_em_aberto": {
+            "type": "formula",
+            "description": "Dias desde criação",
+            "formula": "DATETIME_DIFF(NOW(), {data_criacao}, 'days')"
+          },
+          "status_prazo": {
+            "type": "formula",
+            "description": "Status do prazo",
+            "formula": "IF({data_vencimento}, IF({data_vencimento} < TODAY(), '🔴 Atrasada', IF(DATETIME_DIFF({data_vencimento}, TODAY(), 'days') <= 3, '🟡 Vence em breve', '🟢 No prazo')), '⚪ Sem prazo')"
+          },
+          "eficiencia": {
+            "type": "formula",
+            "description": "Eficiência (estimado vs real)",
+            "formula": "IF(AND({estimativa_horas}, {tempo_gasto}), ROUND(({estimativa_horas} / {tempo_gasto}) * 100, 0) & '%', '')"
+          }
+        },
+        "views": {
+          "tarefas_pendentes": {
+            "type": "grid",
+            "description": "Tarefas pendentes",
+            "filter": "status != 'concluida' AND status != 'cancelada'"
+          },
+          "alta_prioridade": {
+            "type": "grid",
+            "description": "Tarefas de alta prioridade",
+            "filter": "prioridade = 'alta' OR prioridade = 'urgente'"
+          },
+          "vencendo_hoje": {
+            "type": "grid",
+            "description": "Tarefas vencendo hoje",
+            "filter": "IS_SAME({data_vencimento}, TODAY(), 'day')"
+          },
+          "kanban": {
+            "type": "kanban",
+            "description": "Visualização Kanban",
+            "group_by": "status"
+          }
+        }
+      },
+      "Interacoes": {
+        "description": "Histórico de interações e memória contextual",
+        "fields": {
+          "id": {
+            "type": "autonumber",
+            "description": "ID único da interação",
+            "primary_key": true
+          },
+          "usuario": {
+            "type": "link_to_another_record",
+            "description": "Usuário da interação",
+            "linked_table": "Usuarios",
+            "required": true
+          },
+          "tipo": {
+            "type": "single_select",
+            "description": "Tipo de interação",
+            "options": ["whatsapp", "portal", "api", "webhook", "sistema"],
+            "required": true
+          },
+          "canal": {
+            "type": "single_select",
+            "description": "Canal específico",
+            "options": ["whatsapp_message", "whatsapp_command", "portal_action", "api_call", "automation"]
+          },
+          "comando": {
+            "type": "single_line_text",
+            "description": "Comando executado"
+          },
+          "mensagem_usuario": {
+            "type": "long_text",
+            "description": "Mensagem enviada pelo usuário"
+          },
+          "resposta_sistema": {
+            "type": "long_text",
+            "description": "Resposta do sistema"
+          },
+          "contexto": {
+            "type": "long_text",
+            "description": "Contexto da interação em JSON"
+          },
+          "data_hora": {
+            "type": "created_time",
+            "description": "Data e hora da interação"
+          },
+          "duracao_ms": {
+            "type": "number",
+            "description": "Duração do processamento em ms"
+          },
+          "status": {
+            "type": "single_select",
+            "description": "Status da interação",
+            "options": ["sucesso", "erro", "timeout", "cancelada"],
+            "default": "sucesso"
+          },
+          "erro_detalhes": {
+            "type": "long_text",
+            "description": "Detalhes do erro se houver"
+          },
+          "modelo_ia_usado": {
+            "type": "single_select",
+            "description": "Modelo de IA utilizado",
+            "options": ["gpt-4", "gpt-3.5-turbo", "claude-3-sonnet", "claude-3-haiku"]
+          },
+          "tokens_consumidos": {
+            "type": "number",
+            "description": "Tokens consumidos na interação"
+          },
+          "custo_estimado": {
+            "type": "currency",
+            "description": "Custo estimado da interação",
+            "precision": 4
+          },
+          "satisfacao": {
+            "type": "rating",
+            "description": "Satisfação do usuário (1-5)",
+            "max": 5
+          },
+          "feedback": {
+            "type": "long_text",
+            "description": "Feedback do usuário"
+          },
+          "memoria_camada": {
+            "type": "single_select",
+            "description": "Camada de memória",
+            "options": ["MCP", "MMP", "MLP"],
+            "default": "MCP"
+          },
+          "relevancia_score": {
+            "type": "number",
+            "description": "Score de relevância (0-100)",
+            "precision": 2
+          },
+          "tags_contexto": {
+            "type": "multiple_select",
+            "description": "Tags de contexto",
+            "options": ["trabalho", "pessoal", "urgente", "rotina", "novo_aprendizado"]
+          }
+        },
+        "views": {
+          "interacoes_recentes": {
+            "type": "grid",
+            "description": "Interações das últimas 24h",
+            "filter": "DATETIME_DIFF(NOW(), {data_hora}, 'hours') <= 24"
+          },
+          "erros": {
+            "type": "grid",
+            "description": "Interações com erro",
+            "filter": "status = 'erro'"
+          },
+          "alta_relevancia": {
+            "type": "grid",
+            "description": "Interações de alta relevância",
+            "filter": "relevancia_score >= 80"
+          }
+        }
+      },
+      "Configuracoes": {
+        "description": "Configurações e automações personalizadas",
+        "fields": {
+          "id": {
+            "type": "autonumber",
+            "description": "ID único da configuração",
+            "primary_key": true
+          },
+          "usuario": {
+            "type": "link_to_another_record",
+            "description": "Usuário proprietário",
+            "linked_table": "Usuarios",
+            "required": true
+          },
+          "tipo": {
+            "type": "single_select",
+            "description": "Tipo de configuração",
+            "options": ["automacao", "preferencia", "integracao", "notificacao", "personalização"],
+            "required": true
+          },
+          "nome": {
+            "type": "single_line_text",
+            "description": "Nome da configuração",
+            "required": true
+          },
+          "descricao": {
+            "type": "long_text",
+            "description": "Descrição da configuração"
+          },
+          "ativa": {
+            "type": "checkbox",
+            "description": "Configuração ativa",
+            "default": true
+          },
+          "condicoes": {
+            "type": "long_text",
+            "description": "Condições em JSON"
+          },
+          "acoes": {
+            "type": "long_text",
+            "description": "Ações em JSON"
+          },
+          "frequencia": {
+            "type": "single_select",
+            "description": "Frequência de execução",
+            "options": ["manual", "tempo_real", "diaria", "semanal", "mensal"]
+          },
+          "data_criacao": {
+            "type": "created_time",
+            "description": "Data de criação"
+          },
+          "ultima_execucao": {
+            "type": "date_time",
+            "description": "Última execução"
+          },
+          "proxima_execucao": {
+            "type": "date_time",
+            "description": "Próxima execução"
+          },
+          "contador_execucoes": {
+            "type": "number",
+            "description": "Número de execuções"
+          },
+          "taxa_sucesso": {
+            "type": "percent",
+            "description": "Taxa de sucesso das execuções"
+          },
+          "configuracao_json": {
+            "type": "long_text",
+            "description": "Configuração completa em JSON"
+          },
+          "tags": {
+            "type": "multiple_select",
+            "description": "Tags para organização",
+            "options": ["email", "calendario", "tarefas", "notificacoes", "relatorios"]
+          },
+          "prioridade": {
+            "type": "single_select",
+            "description": "Prioridade de execução",
+            "options": ["baixa", "media", "alta"],
+            "default": "media"
+          }
+        },
+        "views": {
+          "configuracoes_ativas": {
+            "type": "grid",
+            "description": "Configurações ativas",
+            "filter": "ativa = true"
+          },
+          "automacoes": {
+            "type": "grid",
+            "description": "Apenas automações",
+            "filter": "tipo = 'automacao'"
+          },
+          "execucao_hoje": {
+            "type": "grid",
+            "description": "Execuções programadas para hoje",
+            "filter": "IS_SAME({proxima_execucao}, TODAY(), 'day')"
+          }
+        }
+      }
+    },
+    "relationships": {
+      "usuario_central": {
+        "description": "Usuário como hub central",
+        "connections": [
+          "Usuarios -> Emails (1:N)",
+          "Usuarios -> Eventos (1:N)",
+          "Usuarios -> Tarefas (1:N)",
+          "Usuarios -> Interacoes (1:N)",
+          "Usuarios -> Configuracoes (1:N)"
+        ]
+      },
+      "cross_references": {
+        "description": "Referências cruzadas entre entidades",
+        "connections": [
+          "Emails -> Tarefas (1:N) - Email pode gerar múltiplas tarefas",
+          "Eventos -> Tarefas (1:N) - Evento pode ter tarefas relacionadas",
+          "Tarefas -> Eventos (1:1) - Tarefa pode virar evento"
+        ]
+      }
+    },
+    "indexes": {
+      "performance": [
+        "Usuarios.email",
+        "Usuarios.telefone",
+        "Emails.data_recebimento",
+        "Eventos.data_inicio",
+        "Tarefas.data_vencimento",
+        "Interacoes.data_hora"
+      ]
+    },
+    "automations": {
+      "airtable_native": [
+        "Email recebido -> Criar notificação",
+        "Tarefa vencendo -> Enviar lembrete",
+        "Evento próximo -> Notificar usuário",
+        "Backup diário -> Atualizar data_ultimo_backup"
+      ]
+    },
+    "validation_rules": {
+      "data_integrity": [
+        "Email deve ser único por usuário",
+        "Telefone deve ser único globalmente",
+        "Data fim evento deve ser maior que data início",
+        "Progresso tarefa deve estar entre 0 e 100%"
+      ]
+    },
+    "performance_targets": {
+      "query_time": "< 3 segundos",
+      "concurrent_users": "500+",
+      "data_retention": "3 meses mínimo",
+      "backup_frequency": "Diário"
+    }
+  }
+}
+

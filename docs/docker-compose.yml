@@ -1,0 +1,363 @@
+# BestStag v9.0 - Docker Compose Configuration
+# Autor: Manus AI
+# Versão: 9.0
+# Data: 2025-06-03
+
+version: '3.8'
+
+services:
+  # n8n - Workflow Automation
+  beststag-n8n:
+    image: n8nio/n8n:latest
+    container_name: beststag-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-beststag2025}
+      - N8N_HOST=${N8N_HOST:-localhost}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=${N8N_PROTOCOL:-http}
+      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
+      - GENERIC_TIMEZONE=${TIMEZONE:-America/Sao_Paulo}
+      - N8N_METRICS=true
+      - N8N_LOG_LEVEL=${N8N_LOG_LEVEL:-info}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-beststag-encryption-key-v9}
+      - DB_TYPE=sqlite
+      - DB_SQLITE_DATABASE=/home/node/.n8n/database.sqlite
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./workflows/n8n:/workflows:ro
+      - ./configs:/configs:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - beststag-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.n8n.rule=Host(`n8n.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.n8n.loadbalancer.server.port=5678"
+
+  # Portal Web - React Application
+  beststag-portal:
+    build:
+      context: ./portal_web
+      dockerfile: Dockerfile
+      args:
+        - NODE_ENV=production
+        - REACT_APP_API_URL=${PORTAL_API_URL:-http://localhost:8000}
+        - REACT_APP_N8N_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
+    container_name: beststag-portal
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - REACT_APP_VERSION=9.0.0
+      - REACT_APP_API_URL=${PORTAL_API_URL:-http://localhost:8000}
+      - REACT_APP_WEBSOCKET_URL=${WEBSOCKET_URL:-ws://localhost:8000/ws}
+    volumes:
+      - ./portal_web/public:/app/public:ro
+      - portal_logs:/app/logs
+    networks:
+      - beststag-network
+    depends_on:
+      - beststag-api
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.portal.rule=Host(`portal.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.portal.loadbalancer.server.port=3000"
+
+  # API Backend - FastAPI
+  beststag-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: beststag-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DEBUG=${DEBUG:-false}
+      - API_VERSION=9.0.0
+      - AIRTABLE_API_KEY=${AIRTABLE_API_KEY}
+      - AIRTABLE_BASE_ID=${AIRTABLE_BASE_ID}
+      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+      - TWILIO_WHATSAPP_NUMBER=${TWILIO_WHATSAPP_NUMBER}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-beststag-jwt-secret-v9}
+      - REDIS_URL=redis://beststag-redis:6379
+      - DATABASE_URL=sqlite:///./beststag.db
+    volumes:
+      - ./scripts:/app/scripts:ro
+      - ./templates:/app/templates:ro
+      - ./configs:/app/configs:ro
+      - api_data:/app/data
+      - api_logs:/app/logs
+    networks:
+      - beststag-network
+    depends_on:
+      - beststag-redis
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.api.loadbalancer.server.port=8000"
+
+  # Redis - Cache and Session Store
+  beststag-redis:
+    image: redis:7-alpine
+    container_name: beststag-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-beststag2025}
+    volumes:
+      - redis_data:/data
+    networks:
+      - beststag-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # PostgreSQL - Database (Optional, alternative to SQLite)
+  beststag-postgres:
+    image: postgres:15-alpine
+    container_name: beststag-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-beststag}
+      - POSTGRES_USER=${POSTGRES_USER:-beststag}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-beststag2025}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/sql:/docker-entrypoint-initdb.d:ro
+    networks:
+      - beststag-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-beststag}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - postgres
+
+  # Nginx - Reverse Proxy and Load Balancer
+  beststag-nginx:
+    image: nginx:alpine
+    container_name: beststag-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./configs/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./configs/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./configs/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    networks:
+      - beststag-network
+    depends_on:
+      - beststag-portal
+      - beststag-api
+      - beststag-n8n
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    profiles:
+      - nginx
+
+  # Traefik - Modern Reverse Proxy (Alternative to Nginx)
+  beststag-traefik:
+    image: traefik:v3.0
+    container_name: beststag-traefik
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # Dashboard
+    command:
+      - --api.dashboard=true
+      - --api.insecure=true
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@beststag.com}
+      - --certificatesresolvers.letsencrypt.acme.storage=/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik_data:/data
+    networks:
+      - beststag-network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.dashboard.rule=Host(`traefik.${DOMAIN:-localhost}`)"
+      - "traefik.http.services.dashboard.loadbalancer.server.port=8080"
+    profiles:
+      - traefik
+
+  # Monitoring - Prometheus
+  beststag-prometheus:
+    image: prom/prometheus:latest
+    container_name: beststag-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./configs/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    networks:
+      - beststag-network
+    profiles:
+      - monitoring
+
+  # Monitoring - Grafana
+  beststag-grafana:
+    image: grafana/grafana:latest
+    container_name: beststag-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-beststag2025}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./configs/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - beststag-network
+    depends_on:
+      - beststag-prometheus
+    profiles:
+      - monitoring
+
+  # Log Management - Loki
+  beststag-loki:
+    image: grafana/loki:latest
+    container_name: beststag-loki
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./configs/loki/loki.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - beststag-network
+    profiles:
+      - logging
+
+  # Log Collection - Promtail
+  beststag-promtail:
+    image: grafana/promtail:latest
+    container_name: beststag-promtail
+    restart: unless-stopped
+    volumes:
+      - ./configs/promtail/promtail.yml:/etc/promtail/config.yml:ro
+      - /var/log:/var/log:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
+    networks:
+      - beststag-network
+    depends_on:
+      - beststag-loki
+    profiles:
+      - logging
+
+  # Backup Service
+  beststag-backup:
+    build:
+      context: ./scripts/backup
+      dockerfile: Dockerfile
+    container_name: beststag-backup
+    restart: unless-stopped
+    environment:
+      - BACKUP_SCHEDULE=${BACKUP_SCHEDULE:-0 2 * * *}
+      - BACKUP_RETENTION_DAYS=${BACKUP_RETENTION_DAYS:-30}
+      - S3_BUCKET=${S3_BACKUP_BUCKET}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+    volumes:
+      - n8n_data:/backup/n8n:ro
+      - api_data:/backup/api:ro
+      - postgres_data:/backup/postgres:ro
+      - ./configs:/backup/configs:ro
+      - backup_data:/backup/output
+    networks:
+      - beststag-network
+    depends_on:
+      - beststag-n8n
+      - beststag-api
+    profiles:
+      - backup
+
+# Networks
+networks:
+  beststag-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+# Volumes
+volumes:
+  n8n_data:
+    driver: local
+  portal_logs:
+    driver: local
+  api_data:
+    driver: local
+  api_logs:
+    driver: local
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+  nginx_logs:
+    driver: local
+  traefik_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  loki_data:
+    driver: local
+  backup_data:
+    driver: local
+

@@ -1,0 +1,436 @@
+{
+  "name": "BestStag v9.0 - Sistema de Memória Contextual",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "memoria",
+        "options": {}
+      },
+      "id": "webhook-memoria",
+      "name": "Webhook Memória",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "beststag-memoria"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.operacao}}",
+              "operation": "equal",
+              "value2": "armazenar"
+            }
+          ]
+        }
+      },
+      "id": "switch-operacao",
+      "name": "Switch Operação",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [460, 300],
+      "parameters": {
+        "options": {
+          "allMatchingOutputs": false
+        },
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.operacao}}",
+              "operation": "equal",
+              "value2": "armazenar"
+            },
+            {
+              "value1": "={{$json.operacao}}",
+              "operation": "equal",
+              "value2": "buscar"
+            },
+            {
+              "value1": "={{$json.operacao}}",
+              "operation": "equal",
+              "value2": "sumarizar"
+            },
+            {
+              "value1": "={{$json.operacao}}",
+              "operation": "equal",
+              "value2": "limpar"
+            },
+            {
+              "value1": "={{$json.operacao}}",
+              "operation": "equal",
+              "value2": "migrar"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Classificar informação e determinar camada de memória\nconst dados = $input.first().json;\nconst conteudo = dados.conteudo;\nconst contexto = dados.contexto || {};\nconst usuario_id = dados.usuario_id;\n\n// Análise de relevância e classificação\nlet camada = 'MCP'; // Padrão: Memória Curto Prazo\nlet relevancia_score = 50; // Score base\nlet tags_contexto = [];\nlet categoria = 'geral';\n\n// Palavras-chave que indicam alta relevância\nconst palavrasAlta = ['importante', 'urgente', 'projeto', 'cliente', 'deadline', 'reunião', 'contrato'];\nconst palavrasMedia = ['tarefa', 'lembrete', 'agenda', 'email', 'telefone'];\nconst palavrasBaixa = ['oi', 'olá', 'obrigado', 'tchau'];\n\n// Analisar conteúdo para determinar relevância\nconst conteudoLower = conteudo.toLowerCase();\n\n// Verificar palavras de alta relevância\npalavrasAlta.forEach(palavra => {\n  if (conteudoLower.includes(palavra)) {\n    relevancia_score += 20;\n    tags_contexto.push('alta_relevancia');\n  }\n});\n\n// Verificar palavras de média relevância\npalavrasMedia.forEach(palavra => {\n  if (conteudoLower.includes(palavra)) {\n    relevancia_score += 10;\n  }\n});\n\n// Verificar palavras de baixa relevância\npalavrasBaixa.forEach(palavra => {\n  if (conteudoLower.includes(palavra)) {\n    relevancia_score -= 10;\n  }\n});\n\n// Determinar categoria\nif (conteudoLower.includes('trabalho') || conteudoLower.includes('cliente') || conteudoLower.includes('projeto')) {\n  categoria = 'trabalho';\n  tags_contexto.push('trabalho');\n} else if (conteudoLower.includes('pessoal') || conteudoLower.includes('família') || conteudoLower.includes('casa')) {\n  categoria = 'pessoal';\n  tags_contexto.push('pessoal');\n} else if (conteudoLower.includes('urgente') || conteudoLower.includes('importante')) {\n  categoria = 'urgente';\n  tags_contexto.push('urgente');\n}\n\n// Determinar camada baseada na relevância e contexto\nif (relevancia_score >= 80) {\n  camada = 'MLP'; // Memória Longo Prazo\n} else if (relevancia_score >= 60) {\n  camada = 'MMP'; // Memória Médio Prazo\n} else {\n  camada = 'MCP'; // Memória Curto Prazo\n}\n\n// Verificar se é informação recorrente (aumenta relevância)\nif (contexto.recorrente || contexto.frequencia > 3) {\n  relevancia_score += 15;\n  if (camada === 'MCP') camada = 'MMP';\n  if (camada === 'MMP' && relevancia_score >= 85) camada = 'MLP';\n}\n\n// Verificar se é relacionado a configurações do usuário\nif (conteudoLower.includes('preferência') || conteudoLower.includes('configuração') || conteudoLower.includes('perfil')) {\n  camada = 'MLP';\n  relevancia_score = Math.max(relevancia_score, 90);\n  tags_contexto.push('configuracao');\n}\n\n// Preparar dados para armazenamento\nconst dadosMemoria = {\n  usuario_id: usuario_id,\n  conteudo: conteudo,\n  contexto_original: JSON.stringify(contexto),\n  camada: camada,\n  relevancia_score: Math.min(100, Math.max(0, relevancia_score)),\n  categoria: categoria,\n  tags_contexto: tags_contexto,\n  data_criacao: new Date().toISOString(),\n  data_expiracao: calcularDataExpiracao(camada),\n  embeddings: null, // Será preenchido posteriormente\n  versao: '9.0'\n};\n\n// Função para calcular data de expiração\nfunction calcularDataExpiracao(camada) {\n  const agora = new Date();\n  switch(camada) {\n    case 'MCP':\n      agora.setHours(agora.getHours() + 24); // 24 horas\n      break;\n    case 'MMP':\n      agora.setDate(agora.getDate() + 30); // 30 dias\n      break;\n    case 'MLP':\n      agora.setFullYear(agora.getFullYear() + 1); // 1 ano\n      break;\n  }\n  return agora.toISOString();\n}\n\nreturn [{ json: dadosMemoria }];"
+      },
+      "id": "classificar-memoria",
+      "name": "Classificar Memória",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [680, 200]
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Interacoes",
+        "fields": {
+          "usuario": ["{{$json.usuario_id}}"],
+          "tipo": "memoria",
+          "canal": "sistema_memoria",
+          "mensagem_usuario": "{{$json.conteudo}}",
+          "contexto": "{{$json.contexto_original}}",
+          "memoria_camada": "{{$json.camada}}",
+          "relevancia_score": "{{$json.relevancia_score}}",
+          "tags_contexto": "{{$json.tags_contexto}}",
+          "status": "sucesso"
+        }
+      },
+      "id": "armazenar-memoria",
+      "name": "Armazenar Memória",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [900, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Buscar memórias relevantes\nconst dados = $input.first().json;\nconst consulta = dados.consulta;\nconst usuario_id = dados.usuario_id;\nconst limite = dados.limite || 10;\nconst camadas = dados.camadas || ['MCP', 'MMP', 'MLP'];\n\n// Preparar filtros para busca\nconst filtros = {\n  usuario_id: usuario_id,\n  camadas: camadas,\n  consulta: consulta,\n  limite: limite\n};\n\n// Análise da consulta para determinar relevância\nconst consultaLower = consulta.toLowerCase();\nlet palavrasChave = consultaLower.split(' ').filter(palavra => palavra.length > 3);\n\n// Remover palavras comuns\nconst palavrasComuns = ['para', 'com', 'uma', 'que', 'não', 'mais', 'como', 'quando', 'onde'];\npalavrasChave = palavrasChave.filter(palavra => !palavrasComuns.includes(palavra));\n\nreturn [{\n  json: {\n    ...filtros,\n    palavras_chave: palavrasChave,\n    timestamp_busca: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "preparar-busca",
+      "name": "Preparar Busca",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Interacoes",
+        "filterByFormula": "AND(usuario = '{{$json.usuario_id}}', OR(memoria_camada = 'MCP', memoria_camada = 'MMP', memoria_camada = 'MLP'))",
+        "sort": [
+          {
+            "field": "relevancia_score",
+            "direction": "desc"
+          },
+          {
+            "field": "data_hora",
+            "direction": "desc"
+          }
+        ],
+        "maxRecords": "{{$json.limite}}"
+      },
+      "id": "buscar-memorias",
+      "name": "Buscar Memórias",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar resultados da busca e calcular relevância\nconst memorias = $input.first().json.records || [];\nconst consulta = $input.first().json.consulta;\nconst palavrasChave = $input.first().json.palavras_chave || [];\n\n// Calcular score de relevância para cada memória\nconst memoriasComScore = memorias.map(memoria => {\n  const conteudo = memoria.fields.mensagem_usuario || '';\n  const conteudoLower = conteudo.toLowerCase();\n  \n  let scoreRelevancia = memoria.fields.relevancia_score || 0;\n  \n  // Bonus por palavras-chave encontradas\n  palavrasChave.forEach(palavra => {\n    if (conteudoLower.includes(palavra)) {\n      scoreRelevancia += 10;\n    }\n  });\n  \n  // Bonus por recência (memórias mais recentes têm score maior)\n  const diasAtras = Math.floor((new Date() - new Date(memoria.fields.data_hora)) / (1000 * 60 * 60 * 24));\n  if (diasAtras <= 1) scoreRelevancia += 15;\n  else if (diasAtras <= 7) scoreRelevancia += 10;\n  else if (diasAtras <= 30) scoreRelevancia += 5;\n  \n  // Bonus por camada de memória\n  const bonusCamada = {\n    'MLP': 20,\n    'MMP': 10,\n    'MCP': 5\n  }[memoria.fields.memoria_camada] || 0;\n  \n  scoreRelevancia += bonusCamada;\n  \n  return {\n    ...memoria,\n    score_final: Math.min(100, scoreRelevancia),\n    dias_atras: diasAtras\n  };\n});\n\n// Ordenar por score final\nmemoriasComScore.sort((a, b) => b.score_final - a.score_final);\n\n// Agrupar por camada\nconst memoriasPorCamada = {\n  MLP: memoriasComScore.filter(m => m.fields.memoria_camada === 'MLP'),\n  MMP: memoriasComScore.filter(m => m.fields.memoria_camada === 'MMP'),\n  MCP: memoriasComScore.filter(m => m.fields.memoria_camada === 'MCP')\n};\n\n// Preparar resposta\nconst resposta = {\n  sucesso: true,\n  consulta: consulta,\n  total_encontradas: memorias.length,\n  memorias_relevantes: memoriasComScore.slice(0, 5), // Top 5\n  distribuicao: {\n    MLP: memoriasPorCamada.MLP.length,\n    MMP: memoriasPorCamada.MMP.length,\n    MCP: memoriasPorCamada.MCP.length\n  },\n  resumo_contexto: gerarResumoContexto(memoriasComScore.slice(0, 3))\n};\n\n// Função para gerar resumo do contexto\nfunction gerarResumoContexto(topMemorias) {\n  if (topMemorias.length === 0) return 'Nenhuma memória relevante encontrada.';\n  \n  const temas = {};\n  topMemorias.forEach(memoria => {\n    const tags = memoria.fields.tags_contexto || [];\n    tags.forEach(tag => {\n      temas[tag] = (temas[tag] || 0) + 1;\n    });\n  });\n  \n  const temasOrdenados = Object.keys(temas).sort((a, b) => temas[b] - temas[a]);\n  \n  return `Contexto principal: ${temasOrdenados.slice(0, 3).join(', ')}. ` +\n         `Baseado em ${topMemorias.length} memórias relevantes.`;\n}\n\nreturn [{ json: resposta }];"
+      },
+      "id": "processar-busca",
+      "name": "Processar Busca",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sumarização inteligente de memórias\nconst dados = $input.first().json;\nconst usuario_id = dados.usuario_id;\nconst camada = dados.camada || 'MCP';\nconst periodo_dias = dados.periodo_dias || 7;\n\n// Calcular data limite\nconst dataLimite = new Date();\ndataLimite.setDate(dataLimite.getDate() - periodo_dias);\n\nreturn [{\n  json: {\n    usuario_id: usuario_id,\n    camada: camada,\n    data_limite: dataLimite.toISOString(),\n    periodo_dias: periodo_dias,\n    operacao: 'sumarizar'\n  }\n}];"
+      },
+      "id": "preparar-sumarizacao",
+      "name": "Preparar Sumarização",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [680, 400]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Interacoes",
+        "filterByFormula": "AND(usuario = '{{$json.usuario_id}}', memoria_camada = '{{$json.camada}}', {data_hora} >= '{{$json.data_limite}}')",
+        "sort": [
+          {
+            "field": "relevancia_score",
+            "direction": "desc"
+          }
+        ]
+      },
+      "id": "buscar-para-sumarizar",
+      "name": "Buscar Para Sumarizar",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [900, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Processar sumarização de memórias\nconst memorias = $input.first().json.records || [];\nconst camada = $input.first().json.camada;\nconst periodo = $input.first().json.periodo_dias;\n\nif (memorias.length === 0) {\n  return [{\n    json: {\n      sucesso: true,\n      mensagem: `Nenhuma memória encontrada na camada ${camada} para sumarização.`,\n      total_memorias: 0\n    }\n  }];\n}\n\n// Agrupar memórias por categoria e tema\nconst categorias = {};\nconst temas = {};\nconst palavrasFrequentes = {};\n\nmemorias.forEach(memoria => {\n  const conteudo = memoria.fields.mensagem_usuario || '';\n  const tags = memoria.fields.tags_contexto || [];\n  \n  // Contar categorias\n  tags.forEach(tag => {\n    categorias[tag] = (categorias[tag] || 0) + 1;\n  });\n  \n  // Extrair palavras-chave\n  const palavras = conteudo.toLowerCase().split(' ')\n    .filter(palavra => palavra.length > 4)\n    .filter(palavra => !['para', 'com', 'uma', 'que', 'não', 'mais', 'como', 'quando', 'onde', 'sobre'].includes(palavra));\n  \n  palavras.forEach(palavra => {\n    palavrasFrequentes[palavra] = (palavrasFrequentes[palavra] || 0) + 1;\n  });\n});\n\n// Identificar padrões\nconst categoriasOrdenadas = Object.keys(categorias)\n  .sort((a, b) => categorias[b] - categorias[a])\n  .slice(0, 5);\n\nconst palavrasOrdenadas = Object.keys(palavrasFrequentes)\n  .sort((a, b) => palavrasFrequentes[b] - palavrasFrequentes[a])\n  .slice(0, 10);\n\n// Gerar insights\nconst insights = [];\n\nif (categorias.trabalho > memorias.length * 0.6) {\n  insights.push('Foco principal em atividades profissionais');\n}\n\nif (categorias.urgente > memorias.length * 0.3) {\n  insights.push('Alto volume de itens urgentes - considere melhor planejamento');\n}\n\nif (palavrasFrequentes.reuniao > 5) {\n  insights.push('Muitas reuniões agendadas - otimize seu calendário');\n}\n\nif (palavrasFrequentes.cliente > 3) {\n  insights.push('Intensa atividade com clientes');\n}\n\n// Criar resumo\nconst resumo = {\n  sucesso: true,\n  periodo_analisado: `${periodo} dias`,\n  camada: camada,\n  total_memorias: memorias.length,\n  categorias_principais: categoriasOrdenadas.map(cat => ({\n    categoria: cat,\n    frequencia: categorias[cat],\n    percentual: Math.round((categorias[cat] / memorias.length) * 100)\n  })),\n  palavras_chave: palavrasOrdenadas.map(palavra => ({\n    palavra: palavra,\n    frequencia: palavrasFrequentes[palavra]\n  })),\n  insights: insights,\n  score_medio_relevancia: Math.round(\n    memorias.reduce((sum, m) => sum + (m.fields.relevancia_score || 0), 0) / memorias.length\n  ),\n  recomendacoes: gerarRecomendacoes(categorias, insights)\n};\n\n// Função para gerar recomendações\nfunction gerarRecomendacoes(cats, insights) {\n  const recs = [];\n  \n  if (cats.urgente > 5) {\n    recs.push('Configure lembretes automáticos para reduzir itens urgentes');\n  }\n  \n  if (cats.trabalho > cats.pessoal * 3) {\n    recs.push('Considere equilibrar melhor vida profissional e pessoal');\n  }\n  \n  if (insights.length === 0) {\n    recs.push('Padrão de uso equilibrado - continue assim!');\n  }\n  \n  return recs;\n}\n\nreturn [{ json: resumo }];"
+      },
+      "id": "processar-sumarizacao",
+      "name": "Processar Sumarização",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1120, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Limpeza automática de memórias expiradas\nconst dados = $input.first().json;\nconst usuario_id = dados.usuario_id;\nconst camada = dados.camada || 'MCP';\nconst forcar_limpeza = dados.forcar || false;\n\n// Calcular data de corte baseada na camada\nconst agora = new Date();\nlet dataCorteMCP = new Date(agora);\nlet dataCorteMP = new Date(agora);\n\n// MCP: 24 horas\ndataCorteMCP.setHours(dataCorteMCP.getHours() - 24);\n\n// MMP: 30 dias (mas só limpa se forçado ou se há muitas memórias)\ndataCorteMP.setDate(dataCorteMP.getDate() - 30);\n\nreturn [{\n  json: {\n    usuario_id: usuario_id,\n    camada: camada,\n    data_corte_mcp: dataCorteMCP.toISOString(),\n    data_corte_mmp: dataCorteMP.toISOString(),\n    forcar_limpeza: forcar_limpeza,\n    operacao: 'limpar'\n  }\n}];"
+      },
+      "id": "preparar-limpeza",
+      "name": "Preparar Limpeza",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [680, 500]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Interacoes",
+        "filterByFormula": "AND(usuario = '{{$json.usuario_id}}', memoria_camada = 'MCP', {data_hora} < '{{$json.data_corte_mcp}}')"
+      },
+      "id": "buscar-expiradas",
+      "name": "Buscar Expiradas",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [900, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Migração inteligente de memórias entre camadas\nconst dados = $input.first().json;\nconst usuario_id = dados.usuario_id;\nconst origem = dados.camada_origem || 'MCP';\nconst destino = dados.camada_destino || 'MMP';\n\n// Critérios para migração\nconst criterios = {\n  MCP_para_MMP: {\n    relevancia_minima: 70,\n    frequencia_minima: 3,\n    idade_minima_horas: 12\n  },\n  MMP_para_MLP: {\n    relevancia_minima: 80,\n    frequencia_minima: 5,\n    idade_minima_dias: 7\n  }\n};\n\nconst chave = `${origem}_para_${destino}`;\nconst criterio = criterios[chave] || criterios.MCP_para_MMP;\n\nreturn [{\n  json: {\n    usuario_id: usuario_id,\n    camada_origem: origem,\n    camada_destino: destino,\n    criterios: criterio,\n    operacao: 'migrar'\n  }\n}];"
+      },
+      "id": "preparar-migracao",
+      "name": "Preparar Migração",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [680, 600]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "base": "={{$env.AIRTABLE_BASE_ID}}",
+        "table": "Interacoes",
+        "filterByFormula": "AND(usuario = '{{$json.usuario_id}}', memoria_camada = '{{$json.camada_origem}}', relevancia_score >= {{$json.criterios.relevancia_minima}})"
+      },
+      "id": "buscar-candidatas-migracao",
+      "name": "Buscar Candidatas Migração",
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 1,
+      "position": [900, 600]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{JSON.stringify($json)}}"
+      },
+      "id": "resposta-memoria",
+      "name": "Resposta Memória",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1340, 400]
+    }
+  ],
+  "connections": {
+    "Webhook Memória": {
+      "main": [
+        [
+          {
+            "node": "Switch Operação",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch Operação": {
+      "main": [
+        [
+          {
+            "node": "Classificar Memória",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Busca",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Sumarização",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Limpeza",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Preparar Migração",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classificar Memória": {
+      "main": [
+        [
+          {
+            "node": "Armazenar Memória",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Armazenar Memória": {
+      "main": [
+        [
+          {
+            "node": "Resposta Memória",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Busca": {
+      "main": [
+        [
+          {
+            "node": "Buscar Memórias",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Memórias": {
+      "main": [
+        [
+          {
+            "node": "Processar Busca",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Busca": {
+      "main": [
+        [
+          {
+            "node": "Resposta Memória",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Sumarização": {
+      "main": [
+        [
+          {
+            "node": "Buscar Para Sumarizar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Para Sumarizar": {
+      "main": [
+        [
+          {
+            "node": "Processar Sumarização",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Processar Sumarização": {
+      "main": [
+        [
+          {
+            "node": "Resposta Memória",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Limpeza": {
+      "main": [
+        [
+          {
+            "node": "Buscar Expiradas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Expiradas": {
+      "main": [
+        [
+          {
+            "node": "Resposta Memória",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Migração": {
+      "main": [
+        [
+          {
+            "node": "Buscar Candidatas Migração",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Candidatas Migração": {
+      "main": [
+        [
+          {
+            "node": "Resposta Memória",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": ["beststag", "memoria", "contextual", "v9.0", "ia"],
+  "triggerCount": 1,
+  "updatedAt": "2025-06-03T20:00:00.000Z",
+  "versionId": "v9.0"
+}
+
