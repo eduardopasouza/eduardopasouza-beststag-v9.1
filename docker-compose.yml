@@ -60,6 +60,27 @@ services:
       - postgres
       - redis
 
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: beststag_backend
+    env_file: .env
+    depends_on:
+      - postgres
+      - redis
+    ports:
+      - "8000:8000"
+
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: beststag_ngrok
+    command: http 8000
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    depends_on:
+      - backend
+
 # Se futuramente quisermos rodar o backend BestStag em contêiner, podemos adicionar algo como:
 #  backend:
 #    build:

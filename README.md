@@ -61,6 +61,17 @@ make dev
 - **N8N**: http://localhost:5678
 - **Adminer**: http://localhost:8080
 
+### Execução Local do Backend
+
+```bash
+# iniciar o servidor FastAPI em modo desenvolvimento
+uvicorn src.backend.app:app --reload --port 8000
+
+# expor a porta 8000 na internet usando ngrok
+chmod +x ngrok_start.sh
+./ngrok_start.sh
+```
+
 ## 📋 Comandos Disponíveis
 
 ```bash

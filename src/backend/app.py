@@ -102,6 +102,9 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Import endpoints that register routes
+from . import whatsapp  # noqa: F401
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=os.getenv('CORS_ORIGINS', '*').split(','),
