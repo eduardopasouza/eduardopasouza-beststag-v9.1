@@ -6,9 +6,9 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-import redis.asyncio as aioredis
 import faiss
 import numpy as np
+import redis.asyncio as aioredis
 
 from config.memory_policies import MEMORY_POLICIES
 
@@ -40,9 +40,7 @@ class ContextualMemorySystem:
             decode_responses=True,
         )
         self.embedding_dim = embedding_dim
-        self.faiss_index = faiss.IndexIDMap(
-            faiss.IndexFlatL2(embedding_dim)
-        )
+        self.faiss_index = faiss.IndexIDMap(faiss.IndexFlatL2(embedding_dim))
 
     async def add_memory(
         self,
@@ -100,6 +98,20 @@ class ContextualMemorySystem:
                 memories.append(json.loads(data))
         return memories
 
+    async def list_memories(
+        self, user_id: str, limit: int = 50, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        """Return paginated memories ordered by creation date desc."""
+        keys = await self.redis.keys(f"memories:{user_id}:*")
+        ids = sorted((int(k.split(":")[-1]) for k in keys), reverse=True)
+        selected = ids[offset : offset + limit]
+        memories: List[Dict[str, Any]] = []
+        for mem_id in selected:
+            data = await self.redis.get(f"memories:{user_id}:{mem_id}")
+            if data:
+                memories.append(json.loads(data))
+        return memories
+
     async def delete_all_memories(self, user_id: str) -> None:
         keys = await self.redis.keys(f"memories:{user_id}:*")
         for key in keys:
@@ -107,9 +119,7 @@ class ContextualMemorySystem:
             if data:
                 mem_id = json.loads(data).get("id")
                 if mem_id is not None:
-                    self.faiss_index.remove_ids(
-                        np.array([int(mem_id)], dtype="int64")
-                    )
+                    self.faiss_index.remove_ids(np.array([int(mem_id)], dtype="int64"))
             await self.redis.delete(key)
 
     async def cleanup_expired_memories(self, user_id: str) -> int:
@@ -117,9 +127,7 @@ class ContextualMemorySystem:
         try:
             keys = await self.redis.keys(f"memories:{user_id}:*")
             removed = 0
-            cutoff = datetime.utcnow() - timedelta(
-                days=MEMORY_POLICIES["retention"]["short_term"]
-            )
+            cutoff = datetime.utcnow() - timedelta(days=MEMORY_POLICIES["retention"]["short_term"])
             threshold = MEMORY_POLICIES["importance_thresholds"]["low"]
             for key in keys:
                 data = await self.redis.get(key)
@@ -130,9 +138,7 @@ class ContextualMemorySystem:
                 created_at = datetime.fromisoformat(item.get("created_at"))
                 if importance < threshold or created_at < cutoff:
                     mem_id = int(item.get("id"))
-                    self.faiss_index.remove_ids(
-                        np.array([mem_id], dtype="int64")
-                    )
+                    self.faiss_index.remove_ids(np.array([mem_id], dtype="int64"))
                     await self.redis.delete(key)
                     removed += 1
             return removed

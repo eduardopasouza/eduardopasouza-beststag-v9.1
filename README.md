@@ -288,6 +288,10 @@ Este projeto está licenciado sob a Licença MIT - veja o arquivo [LICENSE](LICE
 - 📖 Docs: [docs.beststag.com](https://docs.beststag.com)
 - 🐛 Issues: [GitHub Issues](https://github.com/seu-usuario/beststag-v9.1/issues)
 
----
-
-**BestStag v9.1** - Transformando conversas em inteligência 🧠✨
+### Principais Rotas da API
+- `POST /api/memory/cleanup`
+- `GET /api/memory/list`
+- `GET /api/user/export`
+- `DELETE /api/user/delete`
+- `GET /api/email/summary`
+Todas exigem header Authorization: Bearer <token>.
