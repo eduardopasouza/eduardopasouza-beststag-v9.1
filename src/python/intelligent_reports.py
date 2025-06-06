@@ -13,7 +13,7 @@ import logging
 
 # Importar cliente Abacus.AI
 from .abacus_client import AbacusClient
-from src.python.contextual_memory import ContextualMemorySystem
+from src.backend.services.memory_service import ContextualMemorySystem
 
 # Configurar logging
 logging.basicConfig(level=logging.INFO)

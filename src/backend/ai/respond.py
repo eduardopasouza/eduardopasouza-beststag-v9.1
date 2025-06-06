@@ -1,4 +1,5 @@
-"""Stub of AI response generation"""
+"""Stub of AI response generation."""
+
 
 def generate_response(input: str) -> str:
     """Return placeholder response until real AI integration."""
