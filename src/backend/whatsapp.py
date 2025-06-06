@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from fastapi import Form, Response
 from twilio.twiml.messaging_response import MessagingResponse
 
@@ -7,8 +8,13 @@ from src.backend.db import SessionLocal, InboundMessage
 from src.backend.ai import respond
 from src.backend.memory import context
 
+
 @app.post("/webhook/twilio")
-async def twilio_webhook(Body: str = Form(...), From: str = Form(...), To: str = Form(...)):
+async def twilio_webhook(
+    Body: str = Form(...),
+    From: str = Form(...),
+    To: str = Form(...),
+):
     db = SessionLocal()
     inbound = InboundMessage(
         from_number=From,

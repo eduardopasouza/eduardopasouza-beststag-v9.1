@@ -35,6 +35,7 @@ pytest-asyncio>=0.21.0
 black>=23.0.0
 flake8>=6.0.0
 mypy>=1.5.0
+PyJWT>=2.8.0
 
 # Monitoring e logging
 structlog>=23.0.0

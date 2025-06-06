@@ -1,6 +1,6 @@
-"""
-BestStag v9.1 - Aplicação Principal Backend
-FastAPI application com integração Abacus.AI, logging estruturado e health checks
+"""BestStag v9.1 Backend.
+
+FastAPI app com integra\u00e7\u00e3o Abacus.AI, logging e health checks.
 """
 
 import os
@@ -11,21 +11,50 @@ from pathlib import Path
 root_dir = Path(__file__).parent.parent.parent
 sys.path.append(str(root_dir))
 
-from fastapi import FastAPI, HTTPException, BackgroundTasks
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse
-import uvicorn
-from contextlib import asynccontextmanager
-from datetime import datetime
-from typing import Dict, Any, Optional
+from fastapi import (  # noqa: E402
+    FastAPI,
+    HTTPException,
+    BackgroundTasks,
+    APIRouter,
+    Depends,
+    Request,
+    Response,
+)
+from fastapi.security import (  # noqa: E402
+    HTTPAuthorizationCredentials,
+    HTTPBearer,
+)
+import jwt  # noqa: E402
+import time  # noqa: E402
+from fastapi.middleware.cors import CORSMiddleware  # noqa: E402
+from fastapi.middleware.trustedhost import TrustedHostMiddleware  # noqa: E402
+from fastapi.responses import JSONResponse  # noqa: E402
+import uvicorn  # noqa: E402
+from contextlib import asynccontextmanager  # noqa: E402
+from datetime import datetime  # noqa: E402
+from typing import Dict, Any, Optional  # noqa: E402
 
 # Imports locais
-from config.logging_config import setup_logging, get_logger, log_execution
-from config.health_checks import get_health_status, get_simple_health
-from src.python.abacus_client import create_abacus_client
-from src.python.contextual_memory import ContextualMemorySystem
-from src.python.intelligent_reports import IntelligentReportGenerator
+from config.logging_config import (  # noqa: E402
+    setup_logging,
+    get_logger,
+    log_execution,
+)
+from config.health_checks import (  # noqa: E402
+    get_health_status,
+    get_simple_health,
+)
+from src.python.abacus_client import create_abacus_client  # noqa: E402
+from src.backend.services.memory_service import (  # noqa: E402
+    ContextualMemorySystem,
+    MemoryCleanupError,
+)
+from src.backend.services.metrics import record_request  # noqa: E402
+from src.backend.services.user_repository import UserRepository  # noqa: E402
+from src.backend.services.email_repository import EmailRepository  # noqa: E402
+from src.python.intelligent_reports import (  # noqa: E402
+    IntelligentReportGenerator,
+)
 
 # Imports das integrações otimizadas
 try:
@@ -103,7 +132,7 @@ app = FastAPI(
 )
 
 # Import endpoints that register routes
-from . import whatsapp  # noqa: F401
+from . import whatsapp  # noqa: F401,E402
 
 app.add_middleware(
     CORSMiddleware,
@@ -118,33 +147,96 @@ app.add_middleware(
     allowed_hosts=os.getenv('ALLOWED_HOSTS', '*').split(',')
 )
 
+security = HTTPBearer()
+
+
+def verify_token(
+    user_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+) -> None:
+    secret = os.getenv("JWT_SECRET", "secret")
+    try:
+        payload = jwt.decode(
+            credentials.credentials,
+            secret,
+            algorithms=["HS256"],
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail="Invalid token") from exc
+    if payload.get("sub") != user_id:
+        raise HTTPException(status_code=403, detail="Unauthorized")
+
+
+router = APIRouter(prefix="/api/memory")
+
+
+@router.post("/cleanup/{user_id}")
+async def cleanup_memory(
+    user_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    verify_token(user_id, credentials)
+    memory = ContextualMemorySystem()
+    try:
+        removed = await memory.cleanup_expired_memories(user_id)
+        return {"removed_count": removed}
+    except MemoryCleanupError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/user/{user_id}/export")
+async def export_user_data(
+    user_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    verify_token(user_id, credentials)
+    memory = ContextualMemorySystem()
+    memories = await memory.get_all_memories(user_id)
+    user_info = await UserRepository.get_user_info(user_id)
+    emails = await EmailRepository.get_user_emails(user_id)
+    return {"user_info": user_info, "memories": memories, "emails": emails}
+
+
+@router.delete("/user/{user_id}/delete")
+async def delete_user_data(
+    user_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    verify_token(user_id, credentials)
+    memory = ContextualMemorySystem()
+    await memory.delete_all_memories(user_id)
+    await UserRepository.delete_user(user_id)
+    await EmailRepository.delete_all_for_user(user_id)
+    return {"status": "deleted"}
+
+
+app.include_router(router)
+
 
 @app.middleware("http")
 async def log_requests(request, call_next):
     start_time = datetime.utcnow()
     logger.info(
-        f"Requisição recebida: {request.method} {request.url.path}",
+        "Requisição recebida",
         extra={
             'method': request.method,
             'path': request.url.path,
-            'query_params': str(request.query_params),
             'client_ip': request.client.host,
-            'user_agent': request.headers.get('user-agent', ''),
-            'request_id': id(request)
-        }
+            'request_id': id(request),
+        },
     )
     try:
         response = await call_next(request)
         end_time = datetime.utcnow()
         logger.info(
-            f"Resposta enviada: {response.status_code}",
+            "Resposta enviada",
             extra={
                 'method': request.method,
                 'path': request.url.path,
                 'status_code': response.status_code,
                 'processing_time': (end_time - start_time).total_seconds(),
-                'request_id': id(request)
-            }
+                'request_id': id(request),
+            },
         )
         return response
     except Exception as e:
@@ -153,13 +245,27 @@ async def log_requests(request, call_next):
             extra={
                 'method': request.method,
                 'path': request.url.path,
-                'processing_time': (datetime.utcnow() - start_time).total_seconds(),
+                'processing_time': (
+                    datetime.utcnow() - start_time
+                ).total_seconds(),
                 'request_id': id(request),
-                'error_type': type(e).__name__
+                'error_type': type(e).__name__,
             },
             exc_info=True
         )
         raise
+
+
+@app.middleware("http")
+async def prometheus_middleware(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    record_request(
+        request.method,
+        request.url.path,
+        time.time() - start,
+    )
+    return response
 
 
 @app.get("/health")
@@ -173,7 +279,10 @@ async def detailed_health_check():
         return await get_health_status()
     except Exception as e:
         logger.error(f"Erro no health check detalhado: {e}", exc_info=True)
-        return JSONResponse(status_code=503, content={"status": "unhealthy", "error": str(e)})
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "error": str(e)},
+        )
 
 
 @app.get("/")
@@ -184,6 +293,14 @@ async def root():
         "status": "running",
         "timestamp": datetime.utcnow().isoformat() + 'Z'
     }
+
+
+@app.get("/metrics")
+async def metrics():
+    from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+
+    data = generate_latest()
+    return Response(content=data, media_type=CONTENT_TYPE_LATEST)
 
 
 @app.get("/api/info")
@@ -317,7 +434,10 @@ if __name__ == "__main__":
     host = os.getenv('HOST', '0.0.0.0')
     debug = os.getenv('DEBUG', 'false').lower() == 'true'
 
-    logger.info(f"Iniciando servidor BestStag v9.1 em {host}:{port}", extra={'host': host, 'port': port, 'debug': debug})
+    logger.info(
+        f"Iniciando servidor BestStag v9.1 em {host}:{port}",
+        extra={'host': host, 'port': port, 'debug': debug},
+    )
 
     uvicorn.run(
         "app:app",
