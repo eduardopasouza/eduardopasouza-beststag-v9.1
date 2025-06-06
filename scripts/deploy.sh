@@ -49,7 +49,7 @@ show_help() {
     echo ""
     echo "Exemplos:"
     echo "  $0 staging latest"
-    echo "  $0 production v9.1.0"
+    echo "  $0 production v9.1.1"
     echo "  $0 local"
 }
 

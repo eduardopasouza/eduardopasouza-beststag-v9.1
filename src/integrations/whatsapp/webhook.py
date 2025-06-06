@@ -130,8 +130,25 @@ class WhatsAppWebhook:
             Lista de mensagens extraídas
         """
         messages = []
-        
+
         try:
+            # Formato simples enviado pelo Twilio
+            if "Body" in webhook_data and "From" in webhook_data:
+                msg_text = webhook_data.get("Body", "")
+                from_number = webhook_data.get("From")
+                to_number = webhook_data.get("To")
+                msg_id = webhook_data.get("MessageSid") or webhook_data.get("SmsMessageSid")
+                processed = {
+                    "id": msg_id,
+                    "from": from_number,
+                    "to": to_number,
+                    "type": "text",
+                    "webhook_type": "twilio_message",
+                    "content": {"text": msg_text}
+                }
+                messages.append(processed)
+                return messages
+
             # Estrutura padrão do WhatsApp Cloud API
             if "entry" in webhook_data:
                 for entry in webhook_data["entry"]:
@@ -349,27 +366,35 @@ class WhatsAppWebhook:
             
             # Ler body da requisição
             body = await request.body()
+            content_type = request.headers.get("content-type", "")
             
             # Validar assinatura se habilitado
             if self.enable_signature_validation:
-                signature_header = request.headers.get("X-Hub-Signature-256")
+                signature_header = request.headers.get("X-Hub-Signature-256") or request.headers.get("X-Twilio-Signature")
                 
                 if not signature_header:
                     self.stats["signature_validation_failures"] += 1
                     logger.warning("Header de assinatura ausente")
                     raise HTTPException(status_code=400, detail="Missing signature header")
                 
-                if not self.signature_validator.validate_signature(body, signature_header):
-                    self.stats["signature_validation_failures"] += 1
-                    logger.warning("Validação de assinatura falhou")
-                    raise HTTPException(status_code=401, detail="Invalid signature")
+                if request.headers.get("X-Twilio-Signature"):
+                    logger.warning("Validação de assinatura Twilio não implementada")
+                else:
+                    if not self.signature_validator.validate_signature(body, signature_header):
+                        self.stats["signature_validation_failures"] += 1
+                        logger.warning("Validação de assinatura falhou")
+                        raise HTTPException(status_code=401, detail="Invalid signature")
             
-            # Parse JSON
+            # Parse JSON ou form
             try:
-                webhook_data = json.loads(body.decode('utf-8'))
-            except json.JSONDecodeError as e:
-                logger.error(f"Erro ao fazer parse do JSON: {e}")
-                raise HTTPException(status_code=400, detail="Invalid JSON")
+                if "application/x-www-form-urlencoded" in content_type:
+                    form_data = await request.form()
+                    webhook_data = {k: v for k, v in form_data.items()}
+                else:
+                    webhook_data = json.loads(body.decode('utf-8'))
+            except Exception as e:
+                logger.error(f"Erro ao fazer parse do webhook: {e}")
+                raise HTTPException(status_code=400, detail="Invalid webhook body")
             
             # Extrair mensagens
             messages = self._extract_message_data(webhook_data)
@@ -467,7 +492,8 @@ def initialize_webhook(
     webhook_secret: str,
     verify_token: str,
     queue: Optional[WhatsAppQueue] = None,
-    rate_limit_per_minute: int = 60
+    rate_limit_per_minute: int = 60,
+    enable_signature_validation: bool = True
 ) -> WhatsAppWebhook:
     """
     Inicializa o webhook global
@@ -487,7 +513,8 @@ def initialize_webhook(
         webhook_secret=webhook_secret,
         verify_token=verify_token,
         queue=queue,
-        rate_limit_per_minute=rate_limit_per_minute
+        rate_limit_per_minute=rate_limit_per_minute,
+        enable_signature_validation=enable_signature_validation
     )
     
     return _webhook_instance

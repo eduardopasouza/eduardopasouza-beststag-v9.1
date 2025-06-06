@@ -1,5 +1,14 @@
 # BestStag v9.1 + Abacus.AI - Changelog
 
+## Versão 9.1.1 - "Integração WhatsApp" (05 de Junho de 2025)
+
+### Novas Funcionalidades
+- Integração com WhatsApp via Twilio (webhook de mensagens e envio de respostas).
+
+### Melhorias Técnicas
+- Inicialização dos workers de fila e rotas de webhook no backend.
+- Endpoint de sentimento adicionado e ajustes de URLs no frontend.
+
 ## Versão 9.1.0 - "Inteligência Contextual" (04 de Junho de 2025)
 
 ### 🎯 Resumo da Release

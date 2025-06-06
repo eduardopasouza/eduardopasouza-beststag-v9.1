@@ -182,7 +182,7 @@ CREATE TABLE IF NOT EXISTS beststag.system_config (
 
 -- Inserir configurações padrão
 INSERT INTO beststag.system_config (key, value, description) VALUES
-('app_version', '"9.1.0"', 'Versão atual da aplicação'),
+('app_version', '"9.1.1"', 'Versão atual da aplicação'),
 ('max_conversation_history', '100', 'Máximo de mensagens por conversa'),
 ('default_ai_model', '"gpt-3.5-turbo"', 'Modelo de IA padrão'),
 ('sentiment_analysis_enabled', 'true', 'Análise de sentimentos habilitada'),

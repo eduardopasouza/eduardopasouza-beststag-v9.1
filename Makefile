@@ -13,7 +13,7 @@ PIP := pip3
 PYTEST := pytest
 DOCKER_COMPOSE := docker-compose
 PROJECT_NAME := beststag
-VERSION := 9.1.0
+VERSION := 9.1.1
 
 # Cores para output
 RED := \033[0;31m
