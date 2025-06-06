@@ -1,135 +1,103 @@
-
 version: '3.8'
 
 services:
-  # Backend Python
-  backend:
-    build:
-      context: .
-      dockerfile: Dockerfile.backend
-    container_name: beststag-backend
-    ports:
-      - "8000:8000"
-    environment:
-      - ENVIRONMENT=${ENVIRONMENT:-development}
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://redis:6379/0
-      - ABACUS_API_KEY=${ABACUS_API_KEY}
-      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}
-      - LOG_LEVEL=${LOG_LEVEL:-INFO}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - ./logs:/app/logs
-      - ./config:/app/config:ro
-    networks:
-      - beststag-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-
-  # Frontend React
-  frontend:
-    build:
-      context: .
-      dockerfile: Dockerfile.frontend
-    container_name: beststag-frontend
-    ports:
-      - "3000:80"
-    depends_on:
-      - backend
-    networks:
-      - beststag-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # PostgreSQL Database
+  ## === Postgres para BestStag ===
   postgres:
-    image: postgres:15-alpine
-    container_name: beststag-postgres
+    image: postgres:14
+    container_name: beststag_postgres
+    restart: always
     environment:
-      - POSTGRES_DB=${POSTGRES_DB:-beststag}
-      - POSTGRES_USER=${POSTGRES_USER:-beststag}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-beststag123}
-      - PGDATA=/var/lib/postgresql/data/pgdata
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./config/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      POSTGRES_USER: beststag_user
+      POSTGRES_PASSWORD: SenhaForte123!
+      POSTGRES_DB: beststag_db
     ports:
       - "5432:5432"
-    networks:
-      - beststag-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-beststag} -d ${POSTGRES_DB:-beststag}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # Redis Cache
-  redis:
-    image: redis:7-alpine
-    container_name: beststag-redis
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis123}
     volumes:
-      - redis_data:/data
+      - ./pgdata:/var/lib/postgresql/data
+
+  ## === Redis (cache/queue) ===
+  redis:
+    image: redis:6
+    container_name: beststag_redis
+    restart: always
     ports:
       - "6379:6379"
-    networks:
-      - beststag-network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
+    volumes:
+      - ./redisdata:/data
 
-  # N8N Workflow Engine (opcional)
+  ## === n8n (orquestrador de workflows) ===
   n8n:
     image: n8nio/n8n:latest
-    container_name: beststag-n8n
-    ports:
-      - "5678:5678"
+    container_name: beststag_n8n
+    restart: always
     environment:
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=${N8N_USER:-admin}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD:-n8n123}
-      - N8N_HOST=${N8N_HOST:-localhost}
+      # Configurações básicas de acesso
+      - N8N_HOST=0.0.0.0
       - N8N_PORT=5678
       - N8N_PROTOCOL=http
-      - WEBHOOK_URL=${N8N_WEBHOOK_URL:-http://localhost:5678}
-      - GENERIC_TIMEZONE=${TIMEZONE:-America/Sao_Paulo}
+
+      # Autenticação básica (defina N8N_USER e N8N_PASSWORD no seu .env ou exporte antes de iniciar)
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+
+      # Armazenamento em PostgreSQL (para históricos de execução, credenciais, etc.)
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=beststag_db
+      - DB_POSTGRESDB_USER=beststag_user
+      - DB_POSTGRESDB_PASSWORD=SenhaForte123!
+
+      # Armazenamento em Redis (para filas ou cache, se necessário)
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    ports:
+      - "5678:5678"
     volumes:
-      - n8n_data:/home/node/.n8n
-      - ./src/workflows:/home/node/.n8n/workflows:ro
-    networks:
-      - beststag-network
-    restart: unless-stopped
-    profiles:
-      - n8n
+      - ~/.n8n:/home/node/.n8n
+    depends_on:
+      - postgres
+      - redis
 
-volumes:
-  postgres_data:
-    driver: local
-  redis_data:
-    driver: local
-  n8n_data:
-    driver: local
+# Se futuramente quisermos rodar o backend BestStag em contêiner, podemos adicionar algo como:
+#  backend:
+#    build:
+#      context: ./src/backend
+#      dockerfile: Dockerfile
+#    container_name: beststag_backend
+#    restart: always
+#    environment:
+#      - DATABASE_URL=postgresql://beststag_user:SenhaForte123!@postgres:5432/beststag_db
+#      - REDIS_URL=redis://redis:6379
+#      - ABACUS_API_KEY=${ABACUS_API_KEY}
+#      - TWILIO_ACCOUNT_SID=${TWILIO_ACCOUNT_SID}
+#      - TWILIO_AUTH_TOKEN=${TWILIO_AUTH_TOKEN}
+#      - TWILIO_WHATSAPP_NUMBER=${TWILIO_WHATSAPP_NUMBER}
+#      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}
+#    ports:
+#      - "8000:8000"
+#    depends_on:
+#      - postgres
+#      - redis
+#      - n8n
 
-networks:
-  beststag-network:
-    driver: bridge
-    ipam:
-      config:
-        - subnet: 172.20.0.0/16
+# Observações:
+# 1. Mantenha apenas uma seção 'version:' e um bloco único 'services:'.
+# 2. Crie um arquivo .env na raiz do projeto contendo:
+#      N8N_USER=seu_usuario_n8n
+#      N8N_PASSWORD=sua_senha_n8n
+#      ABACUS_API_KEY=s2_f111f4d804dc43709d3842e6ea04688d
+#      TWILIO_ACCOUNT_SID=AC5a1d48ee5db3717b8e867af9c504ccf0
+#      TWILIO_AUTH_TOKEN=8a651d4e550d491814642692f517c4b0
+#      TWILIO_WHATSAPP_NUMBER=whatsapp:+14786062712
+#      REDIS_CLOUD_API_KEY=Av04w6pqpyae2xn680avj5u6vbu4re5jryv41f7mgum8vyrm4
+#    (adapte conforme suas chaves e nomes de variáveis necessários)
+#
+# 3. Para subir apenas o Postgres:
+#      docker-compose up -d postgres
+#
+# 4. Para subir Redis e n8n junto:
+#      docker-compose up -d redis n8n
+#
+# 5. Se for adicionar o próprio backend BestStag em Docker, descomente o bloco `backend:` e crie um Dockerfile dentro de src/backend/ apontando para a aplicação FastAPI.
