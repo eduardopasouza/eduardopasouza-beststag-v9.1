@@ -1,0 +1,135 @@
+{
+  "name": "Calendar Fluxo",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "agenda"
+      },
+      "id": "webhook-agenda",
+      "name": "Webhook Agenda",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {"value1": "={{$json.comando}}", "value2": "criar", "operation": "equal"},
+            {"value1": "={{$json.comando}}", "value2": "alterar", "operation": "equal"},
+            {"value1": "={{$json.comando}}", "value2": "excluir", "operation": "equal"}
+          ]
+        }
+      },
+      "id": "switch-comando",
+      "name": "Switch Comando",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [200, 0]
+    },
+    {
+      "parameters": {
+        "resource": "event",
+        "operation": "create",
+        "calendar": "primary",
+        "summary": "={{$json.evento.titulo}}",
+        "start": "={{$json.evento.data}}",
+        "end": "={{new Date(new Date($json.evento.data).getTime() + ($json.evento.duracao || 60) * 60000).toISOString()}}"
+      },
+      "id": "criar-evento",
+      "name": "Criar Evento",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1,
+      "position": [400, -100],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "google-calendar",
+          "name": "google-calendar"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "event",
+        "operation": "update",
+        "calendar": "primary",
+        "eventId": "={{$json.evento.id}}",
+        "summary": "={{$json.evento.titulo}}",
+        "start": "={{$json.evento.data}}",
+        "end": "={{new Date(new Date($json.evento.data).getTime() + ($json.evento.duracao || 60) * 60000).toISOString()}}"
+      },
+      "id": "atualizar-evento",
+      "name": "Atualizar Evento",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1,
+      "position": [400, 0],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "google-calendar",
+          "name": "google-calendar"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "event",
+        "operation": "delete",
+        "calendar": "primary",
+        "eventId": "={{$json.evento.id}}"
+      },
+      "id": "excluir-evento",
+      "name": "Excluir Evento",
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1,
+      "position": [400, 100],
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "google-calendar",
+          "name": "google-calendar"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "responseMode": "onReceived",
+        "responseData": {
+          "responseBody": "={{JSON.stringify({status:'ok', detalhes: $json})}}"
+        }
+      },
+      "id": "responder",
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [600, 0]
+    }
+  ],
+  "connections": {
+    "Webhook Agenda": {
+      "main": [[{"node": "Switch Comando", "type": "main", "index": 0}]]
+    },
+    "Switch Comando": {
+      "main": [
+        [{"node": "Criar Evento", "type": "main", "index": 0}],
+        [{"node": "Atualizar Evento", "type": "main", "index": 0}],
+        [{"node": "Excluir Evento", "type": "main", "index": 0}]
+      ]
+    },
+    "Criar Evento": {
+      "main": [[{"node": "Responder", "type": "main", "index": 0}]]
+    },
+    "Atualizar Evento": {
+      "main": [[{"node": "Responder", "type": "main", "index": 0}]]
+    },
+    "Excluir Evento": {
+      "main": [[{"node": "Responder", "type": "main", "index": 0}]]
+    }
+  },
+  "pinData": {},
+  "settings": {"executionOrder": "v1"},
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-06-04T00:00:00.000Z",
+  "versionId": "1"
+}

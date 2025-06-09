@@ -1,0 +1,222 @@
+{
+  "name": "WhatsApp Webchat Fluxo",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp"
+      },
+      "id": "webhook-whatsapp",
+      "name": "Webhook WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webchat"
+      },
+      "id": "webhook-webchat",
+      "name": "Webhook Webchat",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [0, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$node[\"Webhook WhatsApp\"].json.body}}",
+              "operation": "notEmpty"
+            }
+          ]
+        }
+      },
+      "id": "switch-canal",
+      "name": "Switch Canal",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [200, 100]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {"name": "canal", "value": "whatsapp"},
+            {"name": "texto", "value": "={{$node[\"Webhook WhatsApp\"].json.Body}}"},
+            {"name": "user", "value": "={{$node[\"Webhook WhatsApp\"].json.From}}"}
+          ]
+        }
+      },
+      "id": "set-whatsapp",
+      "name": "Definir WhatsApp",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [400, 0]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {"name": "canal", "value": "webchat"},
+            {"name": "texto", "value": "={{$node[\"Webhook Webchat\"].json.mensagem}}"},
+            {"name": "user", "value": "={{$node[\"Webhook Webchat\"].json.telefone}}"}
+          ]
+        }
+      },
+      "id": "set-webchat",
+      "name": "Definir Webchat",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [400, 200]
+    },
+    {
+      "parameters": {
+        "url": "https://<SUPABASE_URL>/rest/v1/memoria",
+        "method": "GET",
+        "queryParameters": [
+          {
+            "name": "select",
+            "value": "conteudo"
+          },
+          {
+            "name": "user_id",
+            "value": "eq.{{$json.user}}"
+          }
+        ],
+        "headerParameters": [
+          {"name": "apikey", "value": "<SUPABASE_ANON_KEY>"},
+          {"name": "Authorization", "value": "Bearer <SUPABASE_SERVICE_ROLE_KEY>"}
+        ]
+      },
+      "id": "buscar-contexto",
+      "name": "Buscar Contexto",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [600, 100]
+    },
+    {
+      "parameters": {
+        "url": "https://api.openai.com/v1/chat/completions",
+        "method": "POST",
+        "headerParameters": [
+          {"name": "Authorization", "value": "Bearer <OPENAI_API_KEY>"},
+          {"name": "Content-Type", "value": "application/json"}
+        ],
+        "bodyParametersJson": "{\"model\":\"gpt-4\",\"messages\":[{\"role\":\"system\",\"content\":\"Você é o assistente BestStag. Use o contexto a seguir para responder de forma objetiva:\n{{$node[\\\"Buscar Contexto\\\"].json.map(c=>c.conteudo).join('\\n')}}\n\"},{\"role\":\"user\",\"content\":\"={{$json.texto}}\"}]}"
+      },
+      "id": "chamar-openai",
+      "name": "Chamar OpenAI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [800, 100]
+    },
+    {
+      "parameters": {
+        "url": "https://<SUPABASE_URL>/rest/v1/mensagens",
+        "method": "POST",
+        "headerParameters": [
+          {"name": "apikey", "value": "<SUPABASE_SERVICE_ROLE_KEY>"},
+          {"name": "Content-Type", "value": "application/json"}
+        ],
+        "bodyParametersJson": "[{\"user_id\":\"={{$json.user}}\",\"role\":\"user\",\"content\":\"={{$json.texto}}\"},{\"user_id\":\"={{$json.user}}\",\"role\":\"assistant\",\"content\":\"={{$node[\\\"Chamar OpenAI\\\"].json.choices[0].message.content}}\"}]"
+      },
+      "id": "salvar-mensagens",
+      "name": "Salvar Mensagens",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1000, 100]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {"value1": "={{$json.canal}}", "value2": "whatsapp", "operation": "equal"}
+          ]
+        }
+      },
+      "id": "switch-resposta",
+      "name": "Canal Resposta",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 1,
+      "position": [1200, 100]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "from": "={{$env.TWILIO_WHATSAPP_NUMBER}}",
+        "to": "={{$json.user}}",
+        "message": "={{$node[\"Chamar OpenAI\"].json.choices[0].message.content}}"
+      },
+      "id": "enviar-whatsapp",
+      "name": "Enviar WhatsApp",
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [1400, 0],
+      "credentials": {
+        "twilioApi": {
+          "id": "twilio",
+          "name": "twilio"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "responseMode": "onReceived",
+        "responseData": {
+          "responseBody": "={{JSON.stringify({resposta: $node[\"Chamar OpenAI\"].json.choices[0].message.content})}}"
+        }
+      },
+      "id": "responder-webchat",
+      "name": "Responder Webchat",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1400, 200]
+    }
+  ],
+  "connections": {
+    "Webhook WhatsApp": {
+      "main": [[{"node": "Switch Canal", "type": "main", "index": 0}]]
+    },
+    "Webhook Webchat": {
+      "main": [[{"node": "Switch Canal", "type": "main", "index": 0}]]
+    },
+    "Switch Canal": {
+      "main": [
+        [{"node": "Definir WhatsApp", "type": "main", "index": 0}],
+        [{"node": "Definir Webchat", "type": "main", "index": 0}]
+      ]
+    },
+    "Definir WhatsApp": {
+      "main": [[{"node": "Buscar Contexto", "type": "main", "index": 0}]]
+    },
+    "Definir Webchat": {
+      "main": [[{"node": "Buscar Contexto", "type": "main", "index": 0}]]
+    },
+    "Buscar Contexto": {
+      "main": [[{"node": "Chamar OpenAI", "type": "main", "index": 0}]]
+    },
+    "Chamar OpenAI": {
+      "main": [[{"node": "Salvar Mensagens", "type": "main", "index": 0}]]
+    },
+    "Salvar Mensagens": {
+      "main": [[{"node": "Canal Resposta", "type": "main", "index": 0}]]
+    },
+    "Canal Resposta": {
+      "main": [
+        [{"node": "Enviar WhatsApp", "type": "main", "index": 0}],
+        [{"node": "Responder Webchat", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {"executionOrder": "v1"},
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-06-04T00:00:00.000Z",
+  "versionId": "1"
+}

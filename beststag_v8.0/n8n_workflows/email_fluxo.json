@@ -1,0 +1,110 @@
+{
+  "name": "Email Fluxo",
+  "nodes": [
+    {
+      "parameters": {
+        "event": "messageReceived",
+        "filters": {
+          "readStatus": "unread"
+        }
+      },
+      "id": "gmail-trigger",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "google-oauth",
+          "name": "google-oauth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "functionCode": "// Define prioridade basica\nitems[0].json.prioridade = items[0].json.subject && items[0].json.subject.toLowerCase().includes('urgente') ? 'alta' : 'normal';\nreturn items;"
+      },
+      "id": "classificar",
+      "name": "Classificar",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [200, 0]
+    },
+    {
+      "parameters": {
+        "url": "https://api.openai.com/v1/chat/completions",
+        "method": "POST",
+        "headerParameters": [
+          {"name": "Authorization", "value": "Bearer <OPENAI_API_KEY>"},
+          {"name": "Content-Type", "value": "application/json"}
+        ],
+        "bodyParametersJson": "{\"model\":\"gpt-4\",\"messages\":[{\"role\":\"system\",\"content\":\"Resuma o email e sugira resposta.\"},{\"role\":\"user\",\"content\":\"={{$node[\\\"Gmail Trigger\\\"].json.snippet}}\"}]}"
+      },
+      "id": "openai-email",
+      "name": "Chamar OpenAI",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [400, 0]
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "to": "={{$node[\"Gmail Trigger\"].json.from}}",
+        "subject": "Re: {{$node[\"Gmail Trigger\"].json.subject}}",
+        "message": "={{$node[\"openai-email\"].json.choices[0].message.content}}"
+      },
+      "id": "enviar-email",
+      "name": "Responder Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [600, 0],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "google-oauth",
+          "name": "google-oauth"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "modify",
+        "messageId": "={{$node[\"Gmail Trigger\"].json.id}}",
+        "labelsToRemove": ["UNREAD", "INBOX"]
+      },
+      "id": "arquivar-email",
+      "name": "Arquivar Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 1,
+      "position": [800, 0],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "google-oauth",
+          "name": "google-oauth"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [[{"node": "Classificar", "type": "main", "index": 0}]]
+    },
+    "Classificar": {
+      "main": [[{"node": "Chamar OpenAI", "type": "main", "index": 0}]]
+    },
+    "Chamar OpenAI": {
+      "main": [[{"node": "Responder Email", "type": "main", "index": 0}]]
+    },
+    "Responder Email": {
+      "main": [[{"node": "Arquivar Email", "type": "main", "index": 0}]]
+    }
+  },
+  "pinData": {},
+  "settings": {"executionOrder": "v1"},
+  "staticData": null,
+  "tags": [],
+  "triggerCount": 0,
+  "updatedAt": "2025-06-04T00:00:00.000Z",
+  "versionId": "1"
+}
