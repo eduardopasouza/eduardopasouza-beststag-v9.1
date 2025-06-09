@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Cadastro - BestStag v8.0</title>
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+</head>
+<body>
+    <h1>Cadastro de Usuário</h1>
+    <form id="cadastro-form">
+        <label>Nome: <input type="text" id="nome" required></label><br>
+        <label>Telefone: <input type="text" id="telefone" required></label><br>
+        <label>Email: <input type="email" id="email" required></label><br>
+        <button type="submit">Cadastrar</button>
+    </form>
+    <p id="mensagem"></p>
+
+    <script>
+        // TODO: inserir as chaves do Supabase abaixo
+        const supabaseUrl = "https://<YOUR_SUPABASE>.supabase.co";
+        const supabaseKey = "anon-key-here"; // Use a chave anon
+        const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+        const form = document.getElementById('cadastro-form');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nome = document.getElementById('nome').value;
+            const telefone = document.getElementById('telefone').value;
+            const email = document.getElementById('email').value;
+
+            const { error } = await supabase
+                .from('usuarios')
+                .insert({ nome, telefone, email });
+
+            const msg = document.getElementById('mensagem');
+            if (error) {
+                msg.textContent = 'Erro ao cadastrar usuário: ' + error.message;
+            } else {
+                msg.textContent = 'Usuário cadastrado com sucesso!';
+                form.reset();
+            }
+        });
+    </script>
+</body>
+</html>

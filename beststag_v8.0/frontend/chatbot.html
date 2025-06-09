@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Chatbot - BestStag v8.0</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+</head>
+<body>
+    <h1>Mensagens do Usuário</h1>
+    <label>Telefone: <input type="text" id="telefone" required></label>
+    <button id="carregar">Carregar</button>
+    <br><br>
+    <label>Pergunta: <input type="text" id="inputPergunta"></label>
+    <button id="enviar">Enviar</button>
+    <ul id="lista"></ul>
+
+    <script>
+        // Configure as chaves do Supabase aqui
+        const supabaseUrl = "https://<YOUR_SUPABASE>.supabase.co";
+        const supabaseKey = "anon-key-here";
+        const supabase = supabase.createClient(supabaseUrl, supabaseKey);
+
+        document.getElementById('carregar').addEventListener('click', async () => {
+            const tel = document.getElementById('telefone').value;
+            const { data, error } = await supabase
+                .from('mensagens')
+                .select('role, content, created_at')
+                .eq('telefone', tel)
+                .order('created_at');
+            const lista = document.getElementById('lista');
+            lista.innerHTML = '';
+            if (error) {
+                lista.innerHTML = '<li>Erro ao carregar mensagens</li>';
+                return;
+            }
+            data.forEach((msg) => {
+                const item = document.createElement('li');
+                item.textContent = `${msg.created_at} - ${msg.role}: ${msg.content}`;
+                lista.appendChild(item);
+            });
+        });
+
+        document.getElementById('enviar').addEventListener('click', async () => {
+            const telefone = document.getElementById('telefone').value;
+            const pergunta = document.getElementById('inputPergunta').value;
+            const resp = await fetch('/webhook/webchat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ telefone, mensagem: pergunta })
+            });
+            const resposta = await resp.json();
+            const itemPerg = document.createElement('li');
+            itemPerg.textContent = `${new Date().toISOString()} - user: ${pergunta}`;
+            lista.appendChild(itemPerg);
+            const itemResp = document.createElement('li');
+            itemResp.textContent = `${new Date().toISOString()} - assistant: ${resposta.resposta}`;
+            lista.appendChild(itemResp);
+        });
+    </script>
+</body>
+</html>
