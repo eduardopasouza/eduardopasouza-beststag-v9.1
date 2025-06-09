@@ -1,0 +1,113 @@
+{
+  "name": "BestStag v8.0 - WhatsApp Flow (MVP)",
+  "nodes": [
+    {
+      "id": "1",
+      "name": "Webhook WhatsApp",
+      "type": "n8n-nodes-base.webhook",
+      "parameters": {
+        "path": "beststag/whatsapp/webhook",
+        "method": "POST"
+      },
+      "webhookId": "beststag-whatsapp-v8"
+    },
+    {
+      "id": "2",
+      "name": "Extrair Dados",
+      "type": "n8n-nodes-base.set",
+      "parameters": {
+        "values": {
+          "string": [
+            {"name": "from_number", "value": "={{ $json.body.From.replace('whatsapp:', '') }}"},
+            {"name": "to_number", "value": "={{ $json.body.To }}"},
+            {"name": "message_body", "value": "={{ $json.body.Body }}"}
+          ]
+        }
+      }
+    },
+    {
+      "id": "3",
+      "name": "Upsert User",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/usuarios' }}",
+        "method": "POST",
+        "responseFormat": "json",
+        "headers": {
+          "Content-Type": "application/json",
+          "apikey": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}",
+          "Authorization": "Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}",
+          "Prefer": "resolution=merge-duplicates,return=representation"
+        },
+        "body": "{ \"telefone\": \"{{$node['Extrair Dados'].json.from_number}}\" }"
+      }
+    },
+    {
+      "id": "4",
+      "name": "OpenAI GPT-4",
+      "type": "n8n-nodes-base.openai",
+      "parameters": {
+        "mode": "chat",
+        "chatInstructions": "Você é o BestStag, um assistente virtual prestativo...",
+        "chatPrompt": "={{ $node['Extrair Dados'].json.message_body }}",
+        "model": "gpt-4",
+        "temperature": 0.7
+      },
+      "credentials": {
+        "openaiApi": {"id": "your-openai-credential-id"}
+      }
+    },
+    {
+      "id": "5",
+      "name": "Enviar WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "=https://api.twilio.com/2010-04-01/Accounts/{{$env.TWILIO_ACCOUNT_SID}}/Messages.json",
+        "method": "POST",
+        "authentication": "basicAuth",
+        "options": {"useQueryString": true},
+        "body": {
+          "To": "={{ 'whatsapp:' + $node['Extrair Dados'].json.from_number }}",
+          "From": "={{ $node['Extrair Dados'].json.to_number }}",
+          "Body": "={{ $node['OpenAI GPT-4'].json.choices[0].message.content }}"
+        },
+        "headerParameters": {
+          "authorization": "=Basic {{ Buffer.from($env.TWILIO_ACCOUNT_SID + ':' + $env.TWILIO_AUTH_TOKEN).toString('base64') }}"
+        }
+      }
+    },
+    {
+      "id": "6",
+      "name": "Salvar Mensagens",
+      "type": "n8n-nodes-base.httpRequest",
+      "parameters": {
+        "url": "={{ $env.SUPABASE_URL + '/rest/v1/mensagens' }}",
+        "method": "POST",
+        "headers": {
+          "Content-Type": "application/json",
+          "apikey": "={{ $env.SUPABASE_SERVICE_ROLE_KEY }}",
+          "Authorization": "Bearer {{ $env.SUPABASE_SERVICE_ROLE_KEY }}",
+          "Prefer": "return=minimal"
+        },
+        "body": "=JSON.stringify([ { \"user_id\": {{$node['Upsert User'].json[0].id}}, \"role\": \"user\", \"content\": \"{{$node['Extrair Dados'].json.message_body}}\" }, { \"user_id\": {{$node['Upsert User'].json[0].id}}, \"role\": \"assistant\", \"content\": \"{{$node['OpenAI GPT-4'].json.choices[0].message.content}}\" } ])"
+      }
+    }
+  ],
+  "connections": {
+    "Webhook WhatsApp": {
+      "main": [[{"node": "Extrair Dados", "type": "main", "index": 0}]]
+    },
+    "Extrair Dados": {
+      "main": [[{"node": "Upsert User", "type": "main", "index": 0}]]
+    },
+    "Upsert User": {
+      "main": [[{"node": "OpenAI GPT-4", "type": "main", "index": 0}]]
+    },
+    "OpenAI GPT-4": {
+      "main": [
+        [{"node": "Enviar WhatsApp", "type": "main", "index": 0}],
+        [{"node": "Salvar Mensagens", "type": "main", "index": 0}]
+      ]
+    }
+  }
+}
