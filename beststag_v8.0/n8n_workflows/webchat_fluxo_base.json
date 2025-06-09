@@ -1,0 +1,41 @@
+{
+  "nodes": [
+    {
+      "name": "Webhook Webchat",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webchat"
+      },
+      "notes": "recebe mensagem do chat web"
+    },
+    {
+      "name": "OpenAI",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [200, 0],
+      "parameters": {
+        "operation": "createCompletion",
+        "model": "gpt-4",
+        "prompt": "={{$json.mensagem}}"
+      },
+      "notes": "chamada à OpenAI"
+    },
+    {
+      "name": "Responder",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [400, 0],
+      "parameters": {
+        "responseMode": "onReceived",
+        "responseData": {
+          "responseBody": "={{JSON.stringify({resposta: $json['choices'][0]['text'] || 'Desculpe, não consegui responder no momento.'})}}"
+        }
+      },
+      "notes": "retorna resposta ao frontend"
+    }
+  ],
+  "connections": {}
+}

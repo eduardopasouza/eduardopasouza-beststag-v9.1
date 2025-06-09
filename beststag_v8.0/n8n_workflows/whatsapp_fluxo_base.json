@@ -1,0 +1,113 @@
+{
+  "nodes": [
+    {
+      "name": "Entrada Twilio",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "twilio-webhook"
+      },
+      "notesInFlow": true,
+      "notes": "Webhook que recebe mensagens do WhatsApp"
+    },
+    {
+      "name": "Validador de Payload",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [100, 0],
+      "parameters": {
+        "conditions": {
+          "string": [
+            {"value1": "={{$json['Body']}}", "operation": "notEmpty"},
+            {"value1": "={{$json['From']}}", "operation": "notEmpty"}
+          ]
+        }
+      },
+      "notes": "ignora requisições sem Body ou From"
+    },
+    {
+      "name": "Extrai dados",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 1,
+      "position": [200, 0],
+      "parameters": {
+        "values": {
+          "string": [
+            {"name": "telefone", "value": "={{$json['From']}}"},
+            {"name": "mensagem", "value": "={{$json['Body']}}"}
+          ]
+        }
+      },
+      "notes": "Obtém telefone e texto da mensagem"
+    },
+    {
+      "name": "Upsert Usuário",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [400, 0],
+      "parameters": {
+        "url": "https://<YOUR_SUPABASE>.supabase.co/rest/v1/usuarios",
+        "method": "POST",
+        "payloadType": "json",
+        "bodyParametersJson": "{\"telefone\":\"={{$json.telefone}}\"}"
+      },
+      "notes": "verifica ou cria usuário"
+    },
+    {
+      "name": "OpenAI",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [600, 0],
+      "parameters": {
+        "operation": "createCompletion",
+        "model": "gpt-4",
+        "prompt": "={{$json.mensagem}}"
+      },
+      "notes": "chamada à OpenAI (com fallback)",
+      "description": "Se a resposta vier vazia, retorna texto padrao"
+    },
+    {
+      "name": "Responder Twilio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [800, 0],
+      "parameters": {
+        "url": "https://api.twilio.com/...",
+        "method": "POST",
+        "payloadType": "form-data",
+        "bodyParametersJson": "{\"Body\":\"={{$json['choices'][0]['text'] || 'Desculpe, não consegui responder no momento.'}}\",\"To\":\"={{$json.telefone}}\"}",
+        "options": {}
+      },
+      "notes": "envia resposta para o Twilio"
+    },
+    {
+      "name": "Gravar Mensagens",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1000, 0],
+      "parameters": {
+        "url": "https://<YOUR_SUPABASE>.supabase.co/rest/v1/mensagens",
+        "method": "POST",
+        "payloadType": "json",
+        "bodyParametersJson": "[{\"user_id\":\"={{$json.id}}\",\"role\":\"user\",\"content\":\"={{$json.mensagem}}\"},{\"user_id\":\"={{$json.id}}\",\"role\":\"assistant\",\"content\":\"={{$json['choices'][0]['text'] || 'Desculpe, não consegui responder no momento.'}}\"}]"
+      },
+      "notes": "salva pergunta e resposta"
+    },
+    {
+      "name": "Registrar Log",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1200, 150],
+      "parameters": {
+        "url": "https://<YOUR_SUPABASE>.supabase.co/rest/v1/logs",
+        "method": "POST",
+        "payloadType": "json",
+        "bodyParametersJson": "{\"origem\":\"openai\",\"mensagem\":\"={{$json.error}}\"}"
+      },
+      "notes": "grava falhas da OpenAI"
+    }
+  ],
+  "connections": {}
+}
