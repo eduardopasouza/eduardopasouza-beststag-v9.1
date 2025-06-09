@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chatbot - BestStag v8.0 MVP</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+  <h1>Chatbot Web (Visualizador de Conversas)</h1>
+  <p>Insira o telefone do usuário para carregar o histórico de conversa salvo.</p>
+  <label>Telefone do Usuário:
+    <input type="text" id="phoneInput" placeholder="+55 11 99999-9999" />
+  </label>
+  <button id="loadBtn">Carregar Conversa</button>
+
+  <div id="chatHistory" style="margin-top:20px; padding:10px; border:1px solid #ccc;"></div>
+
+  <script>
+    const SUPABASE_URL = "<YOUR_SUPABASE_URL>";
+    const SUPABASE_ANON_KEY = "<YOUR_SUPABASE_ANON_KEY>";
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function formatMessage(msg) {
+      const role = msg.role === 'assistant' ? '🤖 Bot' : '👤 Usuário';
+      const time = new Date(msg.created_at).toLocaleString();
+      return `<p><b>[${time}] ${role}:</b> ${msg.content}</p>`;
+    }
+
+    document.getElementById('loadBtn').addEventListener('click', async function() {
+      const phone = document.getElementById('phoneInput').value;
+      if (!phone) {
+        alert('Por favor, insira um número de telefone.');
+        return;
+      }
+      document.getElementById('chatHistory').innerHTML = '<em>Carregando...</em>';
+      try {
+        let { data: usuarios, error: userError } = await supabase
+          .from('usuarios')
+          .select('id')
+          .eq('telefone', phone);
+        if (userError) throw userError;
+        if (!usuarios || usuarios.length === 0) {
+          document.getElementById('chatHistory').innerHTML = '<p><strong>Nenhum usuário encontrado com este telefone.</strong></p>';
+          return;
+        }
+        const userId = usuarios[0].id;
+        let { data: msgs, error: msgError } = await supabase
+          .from('mensagens')
+          .select('role, content, created_at')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: true });
+        if (msgError) throw msgError;
+        if (!msgs || msgs.length === 0) {
+          document.getElementById('chatHistory').innerHTML = '<p><em>Não há mensagens para este usuário ainda.</em></p>';
+          return;
+        }
+        const historyHtml = msgs.map(m => formatMessage(m)).join('');
+        document.getElementById('chatHistory').innerHTML = historyHtml;
+      } catch (err) {
+        console.error(err);
+        document.getElementById('chatHistory').innerHTML = '<p><strong>Erro ao carregar mensagens:</strong> ' + err.message + '</p>';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Cadastro - BestStag v8.0 MVP</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+  <h1>Cadastro de Usuário (BestStag v8.0)</h1>
+  <form id="cadastroForm">
+    <label>Nome: <input type="text" name="nome" required /></label><br/>
+    <label>Email: <input type="email" name="email" required /></label><br/>
+    <label>Telefone (WhatsApp): <input type="text" name="telefone" required placeholder="+55 11 99999-9999"/></label><br/>
+    <button type="submit">Cadastrar</button>
+  </form>
+
+  <p id="resultado"></p>
+
+  <script>
+    const SUPABASE_URL = "<YOUR_SUPABASE_URL>";
+    const SUPABASE_ANON_KEY = "<YOUR_SUPABASE_ANON_KEY>";
+    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    document.getElementById('cadastroForm').addEventListener('submit', async function(event) {
+      event.preventDefault();
+      const formData = new FormData(event.target);
+      const nome = formData.get('nome');
+      const email = formData.get('email');
+      const telefone = formData.get('telefone');
+      try {
+        const { data, error } = await supabase.from('usuarios').insert([{ nome, email, telefone }]);
+        if (error) throw error;
+        document.getElementById('resultado').innerText = '✅ Usuário cadastrado com sucesso! ID: ' + data[0].id;
+      } catch (err) {
+        console.error(err);
+        document.getElementById('resultado').innerText = '⚠️ Erro ao cadastrar usuário: ' + err.message;
+      }
+    });
+  </script>
+</body>
+</html>
